@@ -38,3 +38,4 @@ class AppConstants {
   static const TimeOfDay defaultMorningTime = TimeOfDay(hour: 9, minute: 0);
   static const TimeOfDay defaultEveningTime = TimeOfDay(hour: 18, minute: 0);
 }
+
