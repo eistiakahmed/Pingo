@@ -10,6 +10,7 @@ import '../widgets/reminder_card.dart';
 import '../widgets/bottom_action_bar.dart';
 import '../../confirmation/presentation/widgets/confirmation_card.dart';
 import '../../voice_capture/presentation/widgets/voice_listening_overlay.dart';
+import '../../reminder_editor/presentation/screens/edit_reminder_screen.dart';
 import '../../domain/reminder_item.dart';
 
 /// The central Home Screen of Pingo.
@@ -61,11 +62,27 @@ class HomeScreen extends ConsumerWidget {
         );
       },
       onEditDetails: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('বিস্তারিত এডিটর পরবর্তী ধাপে ওপেন হবে'),
-            duration: Duration(seconds: 1),
+        EditReminderScreen.show(
+          context: context,
+          initialItem: ReminderItem(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            title: title,
+            dueAt: dueAt,
+            category: category,
+            priority: category == ReminderCategory.medicine
+                ? ReminderPriority.important
+                : ReminderPriority.normal,
+            repeatRule: title.contains('প্রতিদিন') || title.contains('every day') ? 'প্রতিদিন' : null,
           ),
+          onSave: (savedItem) {
+            ref.read(homeReminderProvider.notifier).addReminder(savedItem);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('রিমাইন্ডার সংরক্ষিত: ${savedItem.title}'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          },
         );
       },
     );
@@ -183,6 +200,14 @@ class HomeScreen extends ConsumerWidget {
                             key: ValueKey(item.id),
                             reminder: item,
                             onToggleDone: () => notifier.toggleDone(item.id),
+                            onTap: () {
+                              EditReminderScreen.show(
+                                context: context,
+                                initialItem: item,
+                                onSave: (saved) => notifier.updateReminder(saved),
+                                onDelete: () => notifier.deleteReminder(item.id),
+                              );
+                            },
                             onSnooze: (duration) =>
                                 notifier.snooze(item.id, duration),
                           );
@@ -219,6 +244,14 @@ class HomeScreen extends ConsumerWidget {
                             key: ValueKey(item.id),
                             reminder: item,
                             onToggleDone: () => notifier.toggleDone(item.id),
+                            onTap: () {
+                              EditReminderScreen.show(
+                                context: context,
+                                initialItem: item,
+                                onSave: (saved) => notifier.updateReminder(saved),
+                                onDelete: () => notifier.deleteReminder(item.id),
+                              );
+                            },
                           );
                         },
                         childCount: completedReminders.length,

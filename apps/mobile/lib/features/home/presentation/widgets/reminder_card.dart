@@ -9,12 +9,14 @@ import '../../domain/reminder_item.dart';
 class ReminderCard extends StatelessWidget {
   final ReminderItem reminder;
   final VoidCallback onToggleDone;
+  final VoidCallback? onTap;
   final Function(Duration duration)? onSnooze;
 
   const ReminderCard({
     super.key,
     required this.reminder,
     required this.onToggleDone,
+    this.onTap,
     this.onSnooze,
   });
 
@@ -110,9 +112,12 @@ class ReminderCard extends StatelessWidget {
 
             // Main Info
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   Row(
                     children: [
                       Expanded(
@@ -228,6 +233,7 @@ class ReminderCard extends StatelessWidget {
                 ],
               ),
             ),
+          ),
 
             // Snooze quick action menu
             if (!reminder.isDone && onSnooze != null)

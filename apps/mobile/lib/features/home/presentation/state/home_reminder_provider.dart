@@ -103,6 +103,23 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
       reminders: [item, ...state.reminders],
     );
   }
+
+  void updateReminder(ReminderItem updatedItem) {
+    state = state.copyWith(
+      reminders: state.reminders.map((r) {
+        if (r.id == updatedItem.id) {
+          return updatedItem;
+        }
+        return r;
+      }).toList(),
+    );
+  }
+
+  void deleteReminder(String id) {
+    state = state.copyWith(
+      reminders: state.reminders.where((r) => r.id != id).toList(),
+    );
+  }
 }
 
 final homeReminderProvider =
