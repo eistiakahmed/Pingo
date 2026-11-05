@@ -17,7 +17,7 @@ class MemoryCapsuleWidget extends StatelessWidget {
   });
 
   String _formatDateTime(DateTime dt) {
-    return DateFormat('EEEE, d MMMM • hh:mm a', 'bn_BD').format(dt);
+    return DateFormat('EEEE, MMM d • hh:mm a').format(dt);
   }
 
   Color _getCategoryColor(ReminderCategory category) {
@@ -79,7 +79,7 @@ class MemoryCapsuleWidget extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'মেমোরি সক্রিয় (Scheduled)',
+                'Active Memory (Scheduled)',
                 style: AppTypography.labelSmall(color: AppColors.brandPrimary),
               ),
               const Spacer(),
@@ -90,7 +90,7 @@ class MemoryCapsuleWidget extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     child: Text(
-                      'এডিট',
+                      'Edit',
                       style: AppTypography.labelSmall(color: AppColors.brandSecondary),
                     ),
                   ),

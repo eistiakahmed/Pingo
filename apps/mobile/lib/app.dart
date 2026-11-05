@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
-import 'features/hub/presentation/screens/main_navigation_shell.dart';
+import 'features/chat/presentation/screens/whatsapp_chat_screen.dart';
 
 /// The root application widget for Pingo Mobile.
 class PingoApp extends StatelessWidget {
@@ -17,15 +17,15 @@ class PingoApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       supportedLocales: const [
-        Locale('bn', 'BD'), // Bangla (Default)
-        Locale('en', 'US'), // English
+        Locale('en', 'US'), // English (Default)
+        Locale('bn', 'BD'), // Bangla
       ],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const MainNavigationShell(),
+      home: const WhatsAppChatScreen(),
     );
   }
 }
