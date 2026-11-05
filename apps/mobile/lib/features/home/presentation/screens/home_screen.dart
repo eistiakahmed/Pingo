@@ -8,6 +8,7 @@ import '../widgets/greeting_header.dart';
 import '../widgets/overdue_banner.dart';
 import '../widgets/reminder_card.dart';
 import '../widgets/bottom_action_bar.dart';
+import '../../confirmation/presentation/widgets/confirmation_card.dart';
 import '../../domain/reminder_item.dart';
 
 /// The central Home Screen of Pingo.
@@ -20,6 +21,54 @@ class HomeScreen extends ConsumerWidget {
     this.onOpenVoice,
     this.onQuickTextSubmit,
   });
+
+  ReminderCategory _inferCategory(String text) {
+    final lower = text.toLowerCase();
+    if (lower.contains('ওষুধ') || lower.contains('medicine') || lower.contains('doctor') || lower.contains('ডাক্তার')) {
+      return ReminderCategory.medicine;
+    } else if (lower.contains('বিল') || lower.contains('bill') || lower.contains('টাকা')) {
+      return ReminderCategory.bill;
+    } else if (lower.contains('অফিস') || lower.contains('work') || lower.contains('meeting') || lower.contains('মিটিং')) {
+      return ReminderCategory.work;
+    } else if (lower.contains('জন্মদিন') || lower.contains('birthday')) {
+      return ReminderCategory.birthday;
+    }
+    return ReminderCategory.personal;
+  }
+
+  void _triggerConfirmationCard(BuildContext context, WidgetRef ref, String title) {
+    final category = _inferCategory(title);
+    final dueAt = DateTime.now().add(const Duration(hours: 3));
+
+    ConfirmationCard.show(
+      context: context,
+      title: title,
+      dateTime: dueAt,
+      category: category,
+      priority: category == ReminderCategory.medicine
+          ? ReminderPriority.important
+          : ReminderPriority.normal,
+      repeatRule: title.contains('প্রতিদিন') || title.contains('every day') ? 'প্রতিদিন' : null,
+      onConfirm: (confirmedItem) {
+        ref.read(homeReminderProvider.notifier).addReminder(confirmedItem);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('রিমাইন্ডার সংরক্ষিত: ${confirmedItem.title}'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+      onEditDetails: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('বিস্তারিত এডিটর পরবর্তী ধাপে ওপেন হবে'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -187,18 +236,18 @@ class HomeScreen extends ConsumerWidget {
             // Bottom Quick Action Dock
             BottomActionBar(
               onTextSubmitted: (text) {
-                // In Step 2, test adding a mock item
-                notifier.addReminder(
-                  ReminderItem(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    title: text,
-                    dueAt: DateTime.now().add(const Duration(hours: 2)),
-                    category: ReminderCategory.personal,
-                  ),
-                );
+                _triggerConfirmationCard(context, ref, text);
                 onQuickTextSubmit?.call(text);
               },
-              onMicTap: onOpenVoice,
+              onMicTap: onOpenVoice ??
+                  () {
+                    // Demo voice result popping up Confirmation Card
+                    _triggerConfirmationCard(
+                      context,
+                      ref,
+                      'কাল বিকাল ৫টায় মায়ের সাথে ডাক্তার',
+                    );
+                  },
             ),
           ],
         ),
@@ -206,3 +255,4 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 }
+
