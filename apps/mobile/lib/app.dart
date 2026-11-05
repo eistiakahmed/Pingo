@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
-import 'features/chat/presentation/screens/chat_screen.dart';
+import 'features/hub/presentation/screens/main_navigation_shell.dart';
 
 /// The root application widget for Pingo Mobile.
 class PingoApp extends StatelessWidget {
@@ -25,9 +25,7 @@ class PingoApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const ChatScreen(),
+      home: const MainNavigationShell(),
     );
   }
 }
-
-
