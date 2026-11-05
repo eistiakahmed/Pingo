@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/typography/app_typography.dart';
+import 'package:pingo_mobile/core/constants/app_constants.dart';
+import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/core/typography/app_typography.dart';
 
 /// Top greeting header with human-centric time-of-day greeting and date badge.
 class GreetingHeader extends StatelessWidget {

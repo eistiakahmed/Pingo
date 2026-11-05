@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/typography/app_typography.dart';
-import '../../../home/domain/reminder_item.dart';
+import 'package:pingo_mobile/core/constants/app_constants.dart';
+import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/core/typography/app_typography.dart';
+import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
 
 /// Full manual reminder creation and editing sheet.
 /// Fulfills requirements R-01, R-02, R-05, R-06 (Full manual control).

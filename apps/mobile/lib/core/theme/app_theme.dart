@@ -35,7 +35,7 @@ class AppTheme {
         titleTextStyle: AppTypography.headlineSmall(color: AppColors.lightTextPrimary),
         iconTheme: const IconThemeData(color: AppColors.lightTextPrimary),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.lightSurface,
         elevation: 0,
         margin: EdgeInsets.zero,
@@ -104,7 +104,7 @@ class AppTheme {
         titleTextStyle: AppTypography.headlineSmall(color: AppColors.darkTextPrimary),
         iconTheme: const IconThemeData(color: AppColors.darkTextPrimary),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.darkSurface,
         elevation: 0,
         margin: EdgeInsets.zero,

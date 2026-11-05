@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/typography/app_typography.dart';
-import '../../domain/reminder_item.dart';
+import 'package:pingo_mobile/core/constants/app_constants.dart';
+import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/core/typography/app_typography.dart';
+import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
 
 /// Informative and non-shaming alert banner for overdue reminders.
 class OverdueBanner extends StatelessWidget {

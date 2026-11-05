@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/typography/app_typography.dart';
+import 'package:pingo_mobile/core/constants/app_constants.dart';
+import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/core/typography/app_typography.dart';
 
 /// Bottom persistent quick capture dock with text field and prominent floating mic button.
 class BottomActionBar extends StatefulWidget {

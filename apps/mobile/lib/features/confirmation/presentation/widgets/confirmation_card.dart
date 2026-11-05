@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/typography/app_typography.dart';
-import '../../../home/domain/reminder_item.dart';
+import 'package:pingo_mobile/core/constants/app_constants.dart';
+import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/core/typography/app_typography.dart';
+import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
 
 /// The interactive Smart Confirmation Card displayed as a modal bottom sheet.
 /// Fulfills requirement M-05 & Product Principle: "Confirm before committing".

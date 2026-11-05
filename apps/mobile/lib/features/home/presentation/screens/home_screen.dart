@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/typography/app_typography.dart';
-import '../state/home_reminder_provider.dart';
-import '../widgets/greeting_header.dart';
-import '../widgets/overdue_banner.dart';
-import '../widgets/reminder_card.dart';
-import '../widgets/bottom_action_bar.dart';
-import '../../confirmation/presentation/widgets/confirmation_card.dart';
-import '../../voice_capture/presentation/widgets/voice_listening_overlay.dart';
-import '../../reminder_editor/presentation/screens/edit_reminder_screen.dart';
-import '../../domain/reminder_item.dart';
+import 'package:pingo_mobile/core/constants/app_constants.dart';
+import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/core/typography/app_typography.dart';
+import 'package:pingo_mobile/features/home/presentation/state/home_reminder_provider.dart';
+import 'package:pingo_mobile/features/home/presentation/widgets/greeting_header.dart';
+import 'package:pingo_mobile/features/home/presentation/widgets/overdue_banner.dart';
+import 'package:pingo_mobile/features/home/presentation/widgets/reminder_card.dart';
+import 'package:pingo_mobile/features/home/presentation/widgets/bottom_action_bar.dart';
+import 'package:pingo_mobile/features/confirmation/presentation/widgets/confirmation_card.dart';
+import 'package:pingo_mobile/features/voice_capture/presentation/widgets/voice_listening_overlay.dart';
+import 'package:pingo_mobile/features/reminder_editor/presentation/screens/edit_reminder_screen.dart';
+import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
 
 /// The central Home Screen of Pingo.
 class HomeScreen extends ConsumerWidget {
