@@ -9,6 +9,7 @@ import '../widgets/overdue_banner.dart';
 import '../widgets/reminder_card.dart';
 import '../widgets/bottom_action_bar.dart';
 import '../../confirmation/presentation/widgets/confirmation_card.dart';
+import '../../voice_capture/presentation/widgets/voice_listening_overlay.dart';
 import '../../domain/reminder_item.dart';
 
 /// The central Home Screen of Pingo.
@@ -241,11 +242,11 @@ class HomeScreen extends ConsumerWidget {
               },
               onMicTap: onOpenVoice ??
                   () {
-                    // Demo voice result popping up Confirmation Card
-                    _triggerConfirmationCard(
-                      context,
-                      ref,
-                      'কাল বিকাল ৫টায় মায়ের সাথে ডাক্তার',
+                    VoiceListeningOverlay.show(
+                      context: context,
+                      onSpeechFinished: (recognizedText) {
+                        _triggerConfirmationCard(context, ref, recognizedText);
+                      },
                     );
                   },
             ),
