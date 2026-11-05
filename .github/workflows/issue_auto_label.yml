@@ -1,0 +1,53 @@
+name: Issue & PR Automation
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request:
+    types: [opened, ready_for_review]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  auto_triage:
+    name: Auto Label & Triage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto Label Issues based on title/body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isIssue = Boolean(context.payload.issue);
+            const item = isIssue ? context.payload.issue : context.payload.pull_request;
+            if (!item) return;
+
+            const title = (item.title || '').toLowerCase();
+            const labelsToAdd = [];
+
+            if (isIssue) {
+              if (title.startsWith('feat:') || title.includes('feature')) {
+                labelsToAdd.push('enhancement', 'feature');
+              } else if (title.startsWith('fix:') || title.includes('bug')) {
+                labelsToAdd.push('bug');
+              } else if (title.startsWith('docs:') || title.includes('doc')) {
+                labelsToAdd.push('documentation');
+              } else if (title.startsWith('ui:') || title.includes('design')) {
+                labelsToAdd.push('ui/ux');
+              } else {
+                labelsToAdd.push('triage');
+              }
+            } else {
+              labelsToAdd.push('needs-review');
+            }
+
+            if (labelsToAdd.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: item.number,
+                labels: labelsToAdd
+              });
+            }

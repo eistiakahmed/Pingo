@@ -1,0 +1,53 @@
+name: "🐛 Bug Report"
+description: File a bug report for Pingo
+title: "fix: [Short bug description]"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue in Pingo!
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      options:
+        - "apps/mobile (Flutter)"
+        - "apps/server (Backend)"
+        - "apps/web (Dashboard)"
+        - "packages/shared_models"
+        - "Other / Infra"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: What steps lead to this bug?
+      placeholder: |
+        1. Open Home screen
+        2. Tap microphone
+        3. Speak 'Kal bikel 5tay ofis'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS version, Device model, Flutter version
+      placeholder: "Android 14 / Pixel 7 / Flutter 3.x"

@@ -1,0 +1,33 @@
+name: "📋 Engineering Task"
+description: Define an architectural or implementation task
+title: "task: [Task title]"
+labels: ["task"]
+body:
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Target Layer
+      options:
+        - "apps/mobile (Flutter UI & Presentation)"
+        - "apps/mobile (Domain & Data Layer)"
+        - "apps/server (Backend API)"
+        - "packages/* (Shared libraries)"
+        - "docs/ & Specifications"
+        - "DevOps / CI/CD"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Task Scope & Objectives
+      description: What specific work needs to be performed?
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Deliverables Checklist
+      value: |
+        - [ ] Implementation complete
+        - [ ] Unit & widget tests passing
+        - [ ] Documentation updated

@@ -1,0 +1,56 @@
+name: Pingo Monorepo CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint_and_analyze:
+    name: Code Quality & Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Flutter Installation
+        run: flutter doctor -v
+
+      - name: Install Dependencies in Mobile
+        working-directory: ./apps/mobile
+        if: hashFiles('apps/mobile/pubspec.yaml') != ''
+        run: flutter pub get
+
+      - name: Analyze Mobile Code
+        working-directory: ./apps/mobile
+        if: hashFiles('apps/mobile/pubspec.yaml') != ''
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run Flutter Tests
+        working-directory: ./apps/mobile
+        if: hashFiles('apps/mobile/test') != ''
+        run: flutter test
+
+  validate_docs_and_structure:
+    name: Validate Architecture & Documentation Integrity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check Essential Documentation Exists
+        run: |
+          test -f README.md || (echo "README.md missing" && exit 1)
+          test -f CONTRIBUTING.md || (echo "CONTRIBUTING.md missing" && exit 1)
+          test -d docs/architecture || (echo "docs/architecture missing" && exit 1)
+          test -d docs/features || (echo "docs/features missing" && exit 1)
+          echo "All core documents validated."

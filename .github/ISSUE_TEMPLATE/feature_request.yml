@@ -1,0 +1,39 @@
+name: "✨ Feature Request"
+description: Propose a new feature or improvement for Pingo
+title: "feat: [Feature title]"
+labels: ["enhancement", "feature"]
+body:
+  - type: dropdown
+    id: pillar
+    attributes:
+      label: Related Core Pillar
+      options:
+        - "Pillar 1: Reminders & Reliable Notifications"
+        - "Pillar 2: Document Vault & OCR Intelligence"
+        - "Pillar 3: Message-to-Reminder (Natural Language NLP)"
+        - "Pillar 4: Voice-to-Reminder"
+        - "Other / UI / Infrastructure"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What user problem does this feature solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / User Journey
+      description: Describe the ideal user interaction in under 5 seconds.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: How will we know this feature is complete?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
