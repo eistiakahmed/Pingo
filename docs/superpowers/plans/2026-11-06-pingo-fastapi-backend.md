@@ -110,50 +110,11 @@ git commit -m "feat(crypto): implement shared Python E2EE AES-256-GCM and PBKDF2
   - `GET /health` returning `{"status": "healthy", "service": "pingo-backend", "version": "1.0.0"}`.
   - RFC 7807 problem details exception handler catching `AppException`, `RequestValidationError`, and unexpected exceptions.
 
-- [ ] **Step 1: Write failing tests for Health and RFC 7807 Exception Format**
-
-```python
-# apps/server/tests/api/test_health.py
-import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-
-@pytest.mark.asyncio
-async def test_health_check_returns_200():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        response = await ac.get("/health")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "healthy"
-    assert data["service"] == "pingo-backend"
-
-@pytest.mark.asyncio
-async def test_rfc7807_validation_error_format():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        response = await ac.post("/api/v1/ai/parse-reminder", json={"invalid": "payload"})
-    assert response.status_code == 422
-    data = response.json()
-    assert "type" in data
-    assert "title" in data
-    assert "status" in data
-    assert data["status"] == 422
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `python3 -m pytest apps/server/tests/api/test_health.py`
-Expected: FAIL (Cannot import 'app' from 'app.main')
-
-- [ ] **Step 3: Implement `app.main`, CORS middleware, exception handlers, and `/health` route**
-
-Set up `FastAPI` instance with title "Pingo API Gateway", `/docs` OpenAPI, CORS origins, exception handlers converting `HTTPException` and `RequestValidationError` to RFC 7807 JSON, and mount `/health`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `python3 -m pytest apps/server/tests/api/test_health.py`
-Expected: PASS
-
-- [ ] **Step 5: Commit application shell**
+- [x] **Step 1: Write failing tests for Health and RFC 7807 Exception Format**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement `app.main`, CORS middleware, exception handlers, and `/health` route**
+- [x] **Step 4: Run test to verify it passes**
+- [x] **Step 5: Commit application shell**
 
 ```bash
 git add apps/server/app/main.py apps/server/app/core/exceptions.py apps/server/app/core/middleware.py apps/server/app/api/ apps/server/tests/api/test_health.py
