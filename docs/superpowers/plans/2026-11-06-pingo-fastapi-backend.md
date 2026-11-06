@@ -76,46 +76,11 @@ git commit -m "feat(server): initialize Python FastAPI project structure and con
   - `encrypt_aes_gcm(plaintext: str, key: bytes, key_version: int = 1) -> EncryptedEnvelope`
   - `decrypt_aes_gcm(envelope: EncryptedEnvelope, key: bytes) -> str`
 
-- [ ] **Step 1: Write failing tests for AES-256-GCM and PBKDF2**
-
-```python
-# packages/e2ee_py/tests/test_crypto.py
-import pytest
-from e2ee.kdf import derive_key_pbkdf2
-from e2ee.aes_gcm import encrypt_aes_gcm, decrypt_aes_gcm
-from e2ee.envelope import EncryptedEnvelope
-
-def test_aes_gcm_roundtrip():
-    salt = b"test-salt-16byte"
-    key = derive_key_pbkdf2("my-secure-pin", salt)
-    assert len(key) == 32
-
-    secret_text = "ডাক্তারের প্রেসক্রিপশন ও ওষুধের রিমাইন্ডার"
-    envelope = encrypt_aes_gcm(secret_text, key, key_version=1)
-
-    assert isinstance(envelope, EncryptedEnvelope)
-    assert envelope.algorithm == "AES-256-GCM"
-    assert envelope.ciphertext != secret_text
-
-    decrypted = decrypt_aes_gcm(envelope, key)
-    assert decrypted == secret_text
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `python3 -m pytest packages/e2ee_py/tests/test_crypto.py`
-Expected: FAIL (ModuleNotFoundError: No module named 'e2ee')
-
-- [ ] **Step 3: Implement AES-256-GCM and PBKDF2 using `cryptography.hazmat`**
-
-Implement `derive_key_pbkdf2`, `encrypt_aes_gcm` generating 12-byte random IVs, and `decrypt_aes_gcm` verifying authentication tags.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `python3 -m pytest packages/e2ee_py/tests/test_crypto.py`
-Expected: PASS
-
-- [ ] **Step 5: Commit E2EE library**
+- [x] **Step 1: Write failing tests for AES-256-GCM and PBKDF2**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement AES-256-GCM and PBKDF2 using `cryptography.hazmat`**
+- [x] **Step 4: Run test to verify it passes**
+- [x] **Step 5: Commit E2EE library**
 
 ```bash
 git add packages/e2ee_py/
