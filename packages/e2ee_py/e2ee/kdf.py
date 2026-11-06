@@ -18,3 +18,4 @@ def derive_key_pbkdf2(
         iterations=iterations,
     )
     return kdf.derive(passphrase.encode("utf-8"))
+

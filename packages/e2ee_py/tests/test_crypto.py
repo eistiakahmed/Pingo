@@ -37,3 +37,4 @@ def test_decrypt_with_tampered_ciphertext_fails():
 
     with pytest.raises(Exception):
         decrypt_aes_gcm(tampered_envelope, key)
+

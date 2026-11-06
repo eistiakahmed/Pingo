@@ -17,9 +17,9 @@ COPY apps/server/requirements.txt ./
 COPY packages/e2ee_py /packages/e2ee_py
 
 # Install dependencies and link local packages
-RUN pip install --no-cache-dir --upgrade pip && \
+RUN pip install --no-cache-dir --upgrade pip setuptools && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -e /packages/e2ee_py
+    pip install --no-cache-dir /packages/e2ee_py
 
 # Copy server code
 COPY apps/server /app
@@ -37,3 +37,4 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

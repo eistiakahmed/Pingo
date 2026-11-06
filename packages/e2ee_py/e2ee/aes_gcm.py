@@ -57,3 +57,4 @@ def decrypt_aes_gcm(
 
     decrypted_bytes = aesgcm.decrypt(iv, encrypted_with_tag, None)
     return decrypted_bytes.decode("utf-8")
+
