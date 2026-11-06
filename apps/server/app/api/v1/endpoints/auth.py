@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppException
+from app.core.rate_limit import check_auth_rate_limit
 from app.core.security import (
     create_access_token,
     get_current_user,
@@ -20,6 +21,9 @@ from app.schemas.auth import (
 
 router = APIRouter()
 
+# Static dummy hash generated at module load to prevent user enumeration via timing attacks
+DUMMY_PASSWORD_HASH = hash_password("dummy-pingo-constant-time-auth-check")
+
 
 @router.post(
     "/register",
@@ -31,6 +35,7 @@ router = APIRouter()
 async def register(
     request: RegisterRequest,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(check_auth_rate_limit),
 ) -> AuthResponse:
     # Check if email already registered
     stmt = select(User).where(User.email == request.email)
@@ -79,12 +84,23 @@ async def register(
 async def login(
     request: LoginRequest,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(check_auth_rate_limit),
 ) -> AuthResponse:
     stmt = select(User).where(User.email == request.email)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(request.password, user.password_hash):
+    if not user:
+        # Uniform timing: execute Argon2 verify against dummy hash to prevent email enumeration
+        verify_password(request.password, DUMMY_PASSWORD_HASH)
+        raise AppException(
+            title="Authentication Failed",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+            type_url="https://api.pingo.app/errors/invalid-credentials",
+        )
+
+    if not verify_password(request.password, user.password_hash):
         raise AppException(
             title="Authentication Failed",
             status_code=status.HTTP_401_UNAUTHORIZED,

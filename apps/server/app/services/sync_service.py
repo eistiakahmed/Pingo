@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.reminder import EncryptedReminder
 from app.models.vault import EncryptedVaultItem
@@ -22,86 +23,91 @@ class SyncService:
         applied_count = 0
         now = datetime.now(timezone.utc)
 
-        # 1. Process Reminders
-        for r_dto in request.reminders:
-            stmt = select(EncryptedReminder).where(
-                EncryptedReminder.user_id == request.user_id,
-                EncryptedReminder.id == r_dto.id,
+        # 1. Atomic Bulk Upsert Reminders with Last-Write-Wins
+        if request.reminders:
+            reminder_values = [
+                {
+                    "id": r.id,
+                    "user_id": request.user_id,
+                    "ciphertext": r.ciphertext,
+                    "iv": r.iv,
+                    "auth_tag": r.auth_tag,
+                    "key_version": r.key_version,
+                    "algorithm": r.algorithm,
+                    "due_at": r.due_at,
+                    "is_completed": r.is_completed,
+                    "version": r.version,
+                    "created_at": r.created_at or now,
+                    "updated_at": now,
+                    "deleted_at": r.deleted_at,
+                }
+                for r in request.reminders
+            ]
+
+            stmt = pg_insert(EncryptedReminder).values(reminder_values)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[EncryptedReminder.id],
+                set_={
+                    "ciphertext": stmt.excluded.ciphertext,
+                    "iv": stmt.excluded.iv,
+                    "auth_tag": stmt.excluded.auth_tag,
+                    "key_version": stmt.excluded.key_version,
+                    "algorithm": stmt.excluded.algorithm,
+                    "due_at": stmt.excluded.due_at,
+                    "is_completed": stmt.excluded.is_completed,
+                    "version": stmt.excluded.version,
+                    "updated_at": now,
+                    "deleted_at": stmt.excluded.deleted_at,
+                },
+                where=(
+                    (EncryptedReminder.user_id == request.user_id)
+                    & (stmt.excluded.version >= EncryptedReminder.version)
+                ),
             )
-            result = await db.execute(stmt)
-            existing = result.scalar_one_or_none()
+            await db.execute(stmt)
+            applied_count += len(request.reminders)
 
-            if existing:
-                # Last-Write-Wins: only apply if incoming version >= existing version
-                if r_dto.version >= existing.version:
-                    existing.ciphertext = r_dto.ciphertext
-                    existing.iv = r_dto.iv
-                    existing.auth_tag = r_dto.auth_tag
-                    existing.key_version = r_dto.key_version
-                    existing.algorithm = r_dto.algorithm
-                    existing.due_at = r_dto.due_at
-                    existing.is_completed = r_dto.is_completed
-                    existing.version = r_dto.version
-                    existing.updated_at = now
-                    existing.deleted_at = r_dto.deleted_at
-                    applied_count += 1
-            else:
-                new_reminder = EncryptedReminder(
-                    id=r_dto.id,
-                    user_id=request.user_id,
-                    ciphertext=r_dto.ciphertext,
-                    iv=r_dto.iv,
-                    auth_tag=r_dto.auth_tag,
-                    key_version=r_dto.key_version,
-                    algorithm=r_dto.algorithm,
-                    due_at=r_dto.due_at,
-                    is_completed=r_dto.is_completed,
-                    version=r_dto.version,
-                    created_at=r_dto.created_at or now,
-                    updated_at=now,
-                    deleted_at=r_dto.deleted_at,
-                )
-                db.add(new_reminder)
-                applied_count += 1
+        # 2. Atomic Bulk Upsert Vault Items with Last-Write-Wins
+        if request.vault_items:
+            vault_values = [
+                {
+                    "id": v.id,
+                    "user_id": request.user_id,
+                    "item_type": v.item_type,
+                    "ciphertext": v.ciphertext,
+                    "iv": v.iv,
+                    "auth_tag": v.auth_tag,
+                    "key_version": v.key_version,
+                    "algorithm": v.algorithm,
+                    "version": v.version,
+                    "created_at": v.created_at or now,
+                    "updated_at": now,
+                    "deleted_at": v.deleted_at,
+                }
+                for v in request.vault_items
+            ]
 
-        # 2. Process Vault Items
-        for v_dto in request.vault_items:
-            stmt = select(EncryptedVaultItem).where(
-                EncryptedVaultItem.user_id == request.user_id,
-                EncryptedVaultItem.id == v_dto.id,
+            v_stmt = pg_insert(EncryptedVaultItem).values(vault_values)
+            v_stmt = v_stmt.on_conflict_do_update(
+                index_elements=[EncryptedVaultItem.id],
+                set_={
+                    "item_type": v_stmt.excluded.item_type,
+                    "ciphertext": v_stmt.excluded.ciphertext,
+                    "iv": v_stmt.excluded.iv,
+                    "auth_tag": v_stmt.excluded.auth_tag,
+                    "key_version": v_stmt.excluded.key_version,
+                    "algorithm": v_stmt.excluded.algorithm,
+                    "version": v_stmt.excluded.version,
+                    "updated_at": now,
+                    "deleted_at": v_stmt.excluded.deleted_at,
+                },
+                where=(
+                    (EncryptedVaultItem.user_id == request.user_id)
+                    & (v_stmt.excluded.version >= EncryptedVaultItem.version)
+                ),
             )
-            result = await db.execute(stmt)
-            existing_vault = result.scalar_one_or_none()
-
-            if existing_vault:
-                if v_dto.version >= existing_vault.version:
-                    existing_vault.item_type = v_dto.item_type
-                    existing_vault.ciphertext = v_dto.ciphertext
-                    existing_vault.iv = v_dto.iv
-                    existing_vault.auth_tag = v_dto.auth_tag
-                    existing_vault.key_version = v_dto.key_version
-                    existing_vault.algorithm = v_dto.algorithm
-                    existing_vault.version = v_dto.version
-                    existing_vault.updated_at = now
-                    existing_vault.deleted_at = v_dto.deleted_at
-                    applied_count += 1
-            else:
-                new_vault = EncryptedVaultItem(
-                    id=v_dto.id,
-                    user_id=request.user_id,
-                    item_type=v_dto.item_type,
-                    ciphertext=v_dto.ciphertext,
-                    iv=v_dto.iv,
-                    auth_tag=v_dto.auth_tag,
-                    key_version=v_dto.key_version,
-                    algorithm=v_dto.algorithm,
-                    version=v_dto.version,
-                    created_at=v_dto.created_at or now,
-                    updated_at=now,
-                    deleted_at=v_dto.deleted_at,
-                )
-                db.add(new_vault)
-                applied_count += 1
+            await db.execute(v_stmt)
+            applied_count += len(request.vault_items)
 
         await db.commit()
 
@@ -173,4 +179,3 @@ class SyncService:
             vault_items=vault_items,
             server_timestamp=now,
         )
-

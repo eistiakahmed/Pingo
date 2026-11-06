@@ -23,6 +23,10 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://pingo:secret@localhost:5432/pingo_db",
         description="Async PostgreSQL connection string with asyncpg",
     )
+    ECHO_SQL: bool = Field(
+        default=False,
+        description="Whether to log SQL queries to stdout (disabled by default to prevent credential leakage)",
+    )
 
     # AI Configuration
     GEMINI_API_KEY: str = Field(

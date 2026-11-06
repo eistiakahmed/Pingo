@@ -3,34 +3,20 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 import pytest
 from app.models.reminder import EncryptedReminder
-from app.schemas.sync import EncryptedReminderDTO, SyncPushRequest
+from app.schemas.sync import EncryptedReminderDTO, EncryptedVaultDTO, SyncPushRequest
 from app.services.sync_service import SyncService
 
 
 @pytest.mark.asyncio
-async def test_sync_service_applies_push_with_lww():
+async def test_sync_service_applies_push_atomic_upsert():
     user_id = uuid4()
     reminder_id = uuid4()
-    now = datetime.now(timezone.utc)
-
-    # Mock existing reminder with version 1
-    existing_reminder = EncryptedReminder(
-        id=reminder_id,
-        user_id=user_id,
-        ciphertext="old_ciphertext",
-        iv="old_iv",
-        auth_tag="old_tag",
-        key_version=1,
-        version=1,
-        updated_at=now,
-    )
+    vault_id = uuid4()
 
     mock_db = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none.return_value = existing_reminder
-    mock_db.execute.return_value = mock_result
+    mock_db.execute = AsyncMock()
+    mock_db.commit = AsyncMock()
 
-    # Incoming reminder with version 2
     r_dto = EncryptedReminderDTO(
         id=reminder_id,
         ciphertext="bmV3X2NpcGhlcnRleHQ=",
@@ -39,17 +25,26 @@ async def test_sync_service_applies_push_with_lww():
         key_version=1,
         version=2,
     )
+    v_dto = EncryptedVaultDTO(
+        id=vault_id,
+        item_type="note",
+        ciphertext="dmF1bHRfY2lwaGVydGV4dA==",
+        iv="dmF1bHRfaXZfMTJieXRlcw==",
+        auth_tag="dmF1bHRfdGFnXzE2Ynl0ZQ==",
+        key_version=1,
+        version=1,
+    )
 
     req = SyncPushRequest(
         user_id=user_id,
         reminders=[r_dto],
-        vault_items=[],
+        vault_items=[v_dto],
     )
 
     response = await SyncService.apply_push(db=mock_db, request=req)
 
     assert response.success is True
-    assert response.applied_count == 1
-    assert existing_reminder.ciphertext == "bmV3X2NpcGhlcnRleHQ="
-    assert existing_reminder.version == 2
-
+    assert response.applied_count == 2
+    # Verify both reminders and vault items were executed in bulk upsert statements
+    assert mock_db.execute.call_count == 2
+    assert mock_db.commit.call_count == 1

@@ -2,6 +2,8 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 import pytest
 from httpx import ASGITransport, AsyncClient
+from app.core.rate_limit import auth_rate_limiter
+from app.core.security import hash_password
 from app.db.session import get_db
 from app.main import app
 from app.models.user import PlanTier, User
@@ -16,13 +18,13 @@ async def test_auth_register_and_login_flow():
     mock_result.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_result
     mock_db.refresh = AsyncMock()
-
     mock_db.add = MagicMock()
 
     async def override_db():
         yield mock_db
 
     app.dependency_overrides[get_db] = override_db
+    auth_rate_limiter.clients.clear()
 
     try:
         async with AsyncClient(
@@ -46,7 +48,6 @@ async def test_auth_register_and_login_flow():
             token = reg_data["access_token"]
 
             # Mock user found for login
-            from app.core.security import hash_password
             existing_user = User(
                 id=user_id,
                 email="newuser@pingo.app",
@@ -80,3 +81,78 @@ async def test_auth_register_and_login_flow():
             assert me_data["plan_tier"] == "FREE"
     finally:
         app.dependency_overrides.clear()
+        auth_rate_limiter.clients.clear()
+
+
+@pytest.mark.asyncio
+async def test_auth_login_nonexistent_user_returns_401():
+    mock_db = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_result
+
+    async def override_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_db
+    auth_rate_limiter.clients.clear()
+
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            res = await ac.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": "nonexistent@pingo.app",
+                    "password": "RandomPassword123!",
+                },
+            )
+            assert res.status_code == 401
+            assert res.json()["detail"] == "Incorrect email or password."
+    finally:
+        app.dependency_overrides.clear()
+        auth_rate_limiter.clients.clear()
+
+
+@pytest.mark.asyncio
+async def test_auth_rate_limiting_triggered():
+    mock_db = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_result
+
+    async def override_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_db
+    auth_rate_limiter.clients.clear()
+
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            # auth_rate_limiter limit is 10/min
+            for _ in range(10):
+                res = await ac.post(
+                    "/api/v1/auth/login",
+                    json={
+                        "email": "attempt@pingo.app",
+                        "password": "WrongPassword123!",
+                    },
+                )
+                assert res.status_code == 401
+
+            # 11th request should trigger 429
+            rate_limited_res = await ac.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": "attempt@pingo.app",
+                    "password": "WrongPassword123!",
+                },
+            )
+            assert rate_limited_res.status_code == 429
+            assert rate_limited_res.json()["title"] == "Rate Limit Exceeded"
+    finally:
+        app.dependency_overrides.clear()
+        auth_rate_limiter.clients.clear()

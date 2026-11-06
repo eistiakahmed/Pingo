@@ -5,11 +5,12 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 def derive_key_pbkdf2(
     passphrase: str,
     salt: bytes,
-    iterations: int = 100_000,
+    iterations: int = 600_000,
     key_length: int = 32,
 ) -> bytes:
     """
     Derives a cryptographically strong 256-bit symmetric key from a passphrase and salt.
+    Default 600,000 iterations conforms with OWASP recommendations for PBKDF2-HMAC-SHA256.
     """
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
