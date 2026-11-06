@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
 
-/// Fullscreen Voice Capture screen matching '4. Voice.png'.
+/// Fullscreen Voice Capture screen with zero demo data.
 class PingoVoiceScreen extends StatefulWidget {
   final Function(String speechText)? onSpeechFinished;
 
@@ -25,8 +25,9 @@ class PingoVoiceScreen extends StatefulWidget {
 class _PingoVoiceScreenState extends State<PingoVoiceScreen>
     with SingleTickerProviderStateMixin {
   String _currentLanguage = 'English + বাংলা';
-  final String _recognizedText = 'Doctor with Mom tomorrow at 5 PM';
+  String _liveSpeechText = ''; // Clean: Starts empty, dynamically populated
   late AnimationController _animController;
+  final TextEditingController _typeController = TextEditingController();
 
   @override
   void initState() {
@@ -40,15 +41,50 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
   @override
   void dispose() {
     _animController.dispose();
+    _typeController.dispose();
     super.dispose();
   }
 
   void _finishVoice([String? customText]) {
-    final text = customText ?? _recognizedText;
+    final text = customText ?? (_liveSpeechText.trim().isNotEmpty ? _liveSpeechText.trim() : 'New reminder');
     Navigator.of(context).pop();
     if (widget.onSpeechFinished != null) {
       widget.onSpeechFinished!(text);
     }
+  }
+
+  void _openTypeDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Type your reminder', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: _typeController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'e.g. Call dentist tomorrow at 10 AM',
+          ),
+          onSubmitted: (val) {
+            Navigator.of(ctx).pop();
+            _finishVoice(val);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.pingoPurple),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _finishVoice(_typeController.text);
+            },
+            child: const Text('Done', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _toggleLanguage() {
@@ -130,9 +166,9 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
               const Spacer(flex: 2),
 
               // Status & Realtime Transcribed Text
-              Text(
+              const Text(
                 'Listening...',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: AppColors.pingoPurple,
@@ -140,24 +176,20 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
               ),
               const SizedBox(height: 14),
 
-              // Transcribed headline with highlighted 5 PM
-              RichText(
+              // Clean text state: Displays live speech or calm prompt
+              Text(
+                _liveSpeechText.isNotEmpty
+                    ? _liveSpeechText
+                    : 'What should I remember for you?',
                 textAlign: TextAlign.center,
-                text: TextSpan(
-                  style: TextStyle(
-                    fontSize: 27,
-                    fontWeight: FontWeight.w800,
-                    height: 1.3,
-                    color: textColor,
-                    letterSpacing: -0.4,
-                  ),
-                  children: const [
-                    TextSpan(text: 'Doctor with Mom\ntomorrow at '),
-                    TextSpan(
-                      text: '5 PM',
-                      style: TextStyle(color: AppColors.pingoPurple),
-                    ),
-                  ],
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  height: 1.3,
+                  color: _liveSpeechText.isNotEmpty
+                      ? textColor
+                      : (isDark ? Colors.white60 : const Color(0xFF9CA3AF)),
+                  letterSpacing: -0.4,
                 ),
               ),
 
@@ -298,9 +330,7 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
 
                   // Type Button
                   InkWell(
-                    onTap: () {
-                      Navigator.of(context).pop();
-                    },
+                    onTap: _openTypeDialog,
                     borderRadius: BorderRadius.circular(24),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),

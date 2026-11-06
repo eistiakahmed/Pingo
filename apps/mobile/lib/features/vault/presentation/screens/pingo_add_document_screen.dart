@@ -311,3 +311,4 @@ class _PingoAddDocumentScreenState extends State<PingoAddDocumentScreen> {
     );
   }
 }
+

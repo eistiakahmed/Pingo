@@ -286,3 +286,4 @@ class _PingoPermissionsScreenState extends State<PingoPermissionsScreen> {
     );
   }
 }
+

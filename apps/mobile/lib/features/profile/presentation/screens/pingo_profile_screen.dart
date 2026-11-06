@@ -18,6 +18,9 @@ class PingoProfileScreen extends StatefulWidget {
 }
 
 class _PingoProfileScreenState extends State<PingoProfileScreen> {
+  String _userName = 'Pingo User';
+  String _userEmail = 'user@pingo.app';
+  String _userPhone = '+880 1700-000000';
   bool _dailySummary = true;
   bool _appLock = true;
   bool _cloudBackup = false;
@@ -77,7 +80,21 @@ class _PingoProfileScreenState extends State<PingoProfileScreen> {
 
             // User Info Card (Tapping opens Edit Profile & Photo Upload)
             InkWell(
-              onTap: () => PingoEditProfileScreen.open(context),
+              onTap: () {
+                PingoEditProfileScreen.open(
+                  context,
+                  initialName: _userName,
+                  initialEmail: _userEmail,
+                  initialPhone: _userPhone,
+                  onSave: (newName, newEmail, newPhone) {
+                    setState(() {
+                      _userName = newName.isNotEmpty ? newName : _userName;
+                      _userEmail = newEmail.isNotEmpty ? newEmail : _userEmail;
+                      _userPhone = newPhone.isNotEmpty ? newPhone : _userPhone;
+                    });
+                  },
+                );
+              },
               borderRadius: BorderRadius.circular(22),
               child: Container(
                 padding: const EdgeInsets.all(18),
@@ -97,10 +114,12 @@ class _PingoProfileScreenState extends State<PingoProfileScreen> {
                             shape: BoxShape.circle,
                             color: Color(0xFFEDEBFD),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
-                              'RA',
-                              style: TextStyle(
+                              _userName.isNotEmpty
+                                  ? _userName.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase()
+                                  : 'U',
+                              style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.pingoPurple,
@@ -133,7 +152,7 @@ class _PingoProfileScreenState extends State<PingoProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Rahim Ahmed',
+                            _userName,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -142,7 +161,7 @@ class _PingoProfileScreenState extends State<PingoProfileScreen> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            'rahim@email.com',
+                            _userEmail,
                             style: TextStyle(fontSize: 14, color: mutedColor),
                           ),
                         ],

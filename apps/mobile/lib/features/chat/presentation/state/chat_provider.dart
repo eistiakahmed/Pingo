@@ -27,68 +27,8 @@ class ChatState {
 class ChatNotifier extends StateNotifier<ChatState> {
   ChatNotifier()
       : super(
-          ChatState(
-            messages: [
-              // Welcome from Pingo Bot
-              ChatMessage(
-                id: '1',
-                text: "Hi Ishtiak! 👋\nI'm your personal memory assistant. Just message or send a voice note — I'll remember everything, schedule reminders, and create documents for you.",
-                sender: ChatMessageSender.pingo,
-                timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
-              ),
-
-              // Sample previous user reminder
-              ChatMessage(
-                id: '2',
-                text: "Remind me to visit Square Hospital with Mom tomorrow at 5 PM",
-                sender: ChatMessageSender.user,
-                timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
-              ),
-
-              // Pingo response with memory capsule
-              ChatMessage(
-                id: '3',
-                text: "Got it! I've saved this reminder to your memory vault.",
-                sender: ChatMessageSender.pingo,
-                type: ChatMessageType.memoryReminder,
-                reminder: ReminderItem(
-                  id: 'rem_1',
-                  title: 'Doctor appointment with Mom',
-                  dueAt: DateTime.now().add(const Duration(days: 1, hours: 2)),
-                  category: ReminderCategory.personal,
-                  priority: ReminderPriority.important,
-                ),
-                timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
-              ),
-
-              // Sample previous documentation request
-              ChatMessage(
-                id: '4',
-                text: "Create a summary document from today's client sync meeting",
-                sender: ChatMessageSender.user,
-                timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-              ),
-
-              // Pingo response with structured Document Note
-              ChatMessage(
-                id: '5',
-                text: "Here is your generated document. It has been indexed in your vault.",
-                sender: ChatMessageSender.pingo,
-                type: ChatMessageType.documentNote,
-                document: const DocumentPayload(
-                  title: 'Client Sync & Deliverables (Q4)',
-                  category: 'Work & Projects',
-                  summary: 'Sprint planning and core milestone agreement for the mobile app launch.',
-                  bulletPoints: [
-                    'Sprint velocity locked for Phase 1 MVP release',
-                    'Figma design tokens approved for Flutter client',
-                    'Backend API contracts finalized with authentication specs',
-                  ],
-                  tags: ['Meeting', 'Client', 'Q4 Roadmap'],
-                ),
-                timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-              ),
-            ],
+          const ChatState(
+            messages: [], // Clean: Zero demo messages
           ),
         );
 

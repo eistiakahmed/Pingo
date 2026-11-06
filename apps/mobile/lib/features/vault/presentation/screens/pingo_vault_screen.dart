@@ -3,14 +3,51 @@ import 'package:pingo_mobile/core/theme/app_colors.dart';
 import 'package:pingo_mobile/features/vault/presentation/screens/pingo_add_document_screen.dart';
 import 'package:pingo_mobile/features/vault/presentation/screens/pingo_document_detail_screen.dart';
 
-/// Screen implementing '11. Vault.png'.
-class PingoVaultScreen extends StatelessWidget {
+/// Document model for the Vault
+class VaultDocument {
+  final String id;
+  final String title;
+  final String category;
+  final String expiresDate;
+  final String statusText;
+  final Color statusBg;
+  final Color statusColor;
+
+  const VaultDocument({
+    required this.id,
+    required this.title,
+    required this.category,
+    required this.expiresDate,
+    required this.statusText,
+    required this.statusBg,
+    required this.statusColor,
+  });
+}
+
+/// Screen implementing '11. Vault.png' with clean dynamic data & zero mock data.
+class PingoVaultScreen extends StatefulWidget {
   const PingoVaultScreen({super.key});
 
   static void open(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const PingoVaultScreen()),
     );
+  }
+
+  @override
+  State<PingoVaultScreen> createState() => _PingoVaultScreenState();
+}
+
+class _PingoVaultScreenState extends State<PingoVaultScreen> {
+  // Clean dynamic list: Starts completely empty (no mock data)
+  final List<VaultDocument> _documents = [];
+
+  void _addNewDocFromScanner() {
+    PingoAddDocumentScreen.open(context);
+  }
+
+  int _getCount(String category) {
+    return _documents.where((d) => d.category.toLowerCase() == category.toLowerCase()).length;
   }
 
   @override
@@ -110,14 +147,14 @@ class PingoVaultScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 2x2 Category Grid
+                // 2x2 Category Grid (Dynamic counts)
                 Row(
                   children: [
                     Expanded(
                       child: _categoryCard(
                         icon: Icons.person_outline_rounded,
                         label: 'Identity',
-                        docCount: '4 documents',
+                        docCount: '${_getCount('Identity')} documents',
                         iconBg: const Color(0xFFECEBFC),
                         iconColor: AppColors.pingoPurple,
                         cardBg: cardBg,
@@ -131,7 +168,7 @@ class PingoVaultScreen extends StatelessWidget {
                       child: _categoryCard(
                         icon: Icons.account_balance_wallet_outlined,
                         label: 'Finance',
-                        docCount: '6 documents',
+                        docCount: '${_getCount('Finance')} documents',
                         iconBg: const Color(0xFFFEF3C7),
                         iconColor: const Color(0xFFD97706),
                         cardBg: cardBg,
@@ -149,7 +186,7 @@ class PingoVaultScreen extends StatelessWidget {
                       child: _categoryCard(
                         icon: Icons.favorite_border_rounded,
                         label: 'Health',
-                        docCount: '3 documents',
+                        docCount: '${_getCount('Health')} documents',
                         iconBg: const Color(0xFFFEE2E2),
                         iconColor: const Color(0xFFDC2626),
                         cardBg: cardBg,
@@ -163,7 +200,7 @@ class PingoVaultScreen extends StatelessWidget {
                       child: _categoryCard(
                         icon: Icons.school_outlined,
                         label: 'Education',
-                        docCount: '2 documents',
+                        docCount: '${_getCount('Education')} documents',
                         iconBg: const Color(0xFFD1FAE5),
                         iconColor: const Color(0xFF059669),
                         cardBg: cardBg,
@@ -188,46 +225,70 @@ class PingoVaultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
 
-                // Item 1: Driving license
-                _documentItem(
-                  context: context,
-                  title: 'Driving license',
-                  category: 'Identity',
-                  badgeText: 'Expires Mar 2027',
-                  badgeColor: const Color(0xFFFEF3C7),
-                  badgeTextColor: const Color(0xFFB45309),
-                  textColor: textColor,
-                  mutedColor: mutedColor,
-                  borderColor: borderColor,
-                ),
-                Divider(color: borderColor, height: 1),
-
-                // Item 2: Car insurance
-                _documentItem(
-                  context: context,
-                  title: 'Car insurance',
-                  category: 'Finance',
-                  badgeText: 'Renews Dec 1',
-                  badgeColor: const Color(0xFFFEE2E2),
-                  badgeTextColor: const Color(0xFFDC2626),
-                  textColor: textColor,
-                  mutedColor: mutedColor,
-                  borderColor: borderColor,
-                ),
-                Divider(color: borderColor, height: 1),
-
-                // Item 3: Passport
-                _documentItem(
-                  context: context,
-                  title: 'Passport',
-                  category: 'Identity',
-                  badgeText: 'Expires 2029',
-                  badgeColor: const Color(0xFFD1FAE5),
-                  badgeTextColor: const Color(0xFF047857),
-                  textColor: textColor,
-                  mutedColor: mutedColor,
-                  borderColor: borderColor,
-                ),
+                // Empty State vs Document List
+                if (_documents.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: borderColor, width: 1.2),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.pingoPurpleLight,
+                          ),
+                          child: const Icon(
+                            Icons.folder_open_rounded,
+                            color: AppColors.pingoPurple,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Your vault is empty',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Add your passport, driving license, or insurance documents to keep them safe and track expiry dates.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            color: mutedColor,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ..._documents.map((doc) => Column(
+                        children: [
+                          _documentItem(
+                            context: context,
+                            title: doc.title,
+                            category: doc.category,
+                            badgeText: doc.statusText,
+                            badgeColor: doc.statusBg,
+                            badgeTextColor: doc.statusColor,
+                            textColor: textColor,
+                            mutedColor: mutedColor,
+                            borderColor: borderColor,
+                          ),
+                          Divider(color: borderColor, height: 1),
+                        ],
+                      )),
 
                 const SizedBox(height: 100),
               ],
@@ -240,7 +301,7 @@ class PingoVaultScreen extends StatelessWidget {
               bottom: 18,
               child: Center(
                 child: InkWell(
-                  onTap: () => PingoAddDocumentScreen.open(context),
+                  onTap: _addNewDocFromScanner,
                   borderRadius: BorderRadius.circular(28),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 16),

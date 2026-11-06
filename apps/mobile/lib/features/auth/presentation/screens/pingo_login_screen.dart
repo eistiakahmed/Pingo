@@ -224,3 +224,4 @@ class PingoLoginScreen extends StatelessWidget {
     );
   }
 }
+

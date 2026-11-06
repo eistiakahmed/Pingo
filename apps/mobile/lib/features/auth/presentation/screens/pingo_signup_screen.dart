@@ -267,3 +267,4 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
     );
   }
 }
+

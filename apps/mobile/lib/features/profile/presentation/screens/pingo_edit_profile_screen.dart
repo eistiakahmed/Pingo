@@ -10,16 +10,16 @@ class PingoEditProfileScreen extends StatefulWidget {
 
   const PingoEditProfileScreen({
     super.key,
-    this.initialName = 'Rahim Ahmed',
-    this.initialEmail = 'rahim@email.com',
-    this.initialPhone = '+880 1711-000000',
+    this.initialName = 'Pingo User',
+    this.initialEmail = 'user@pingo.app',
+    this.initialPhone = '+880 1700-000000',
     this.onSave,
   });
 
   static void open(BuildContext context, {
-    String initialName = 'Rahim Ahmed',
-    String initialEmail = 'rahim@email.com',
-    String initialPhone = '+880 1711-000000',
+    String initialName = 'Pingo User',
+    String initialEmail = 'user@pingo.app',
+    String initialPhone = '+880 1700-000000',
     Function(String, String, String)? onSave,
   }) {
     Navigator.of(context).push(
@@ -284,10 +284,12 @@ class _PingoEditProfileScreenState extends State<PingoEditProfileScreen> {
                             child: Center(
                               child: _selectedAvatarAsset != null
                                   ? const Icon(Icons.person, color: AppColors.pingoPurple, size: 58)
-                                  : const Text(
-                                      'RA',
-                                      style: TextStyle(
-                                        fontSize: 36,
+                                  : Text(
+                                      _nameController.text.isNotEmpty
+                                          ? _nameController.text.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+                                          : 'U',
+                                      style: const TextStyle(
+                                        fontSize: 34,
                                         fontWeight: FontWeight.w800,
                                         color: AppColors.pingoPurple,
                                       ),

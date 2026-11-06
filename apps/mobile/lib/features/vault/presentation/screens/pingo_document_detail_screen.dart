@@ -308,3 +308,4 @@ class PingoDocumentDetailScreen extends StatelessWidget {
     );
   }
 }
+

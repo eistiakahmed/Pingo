@@ -31,65 +31,37 @@ class HomeReminderState {
   }
 }
 
-/// State notifier managing home reminders with realistic bilingual sample data.
+/// State notifier managing home reminders with clean, dynamic data.
 class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
   HomeReminderNotifier()
       : super(
-          HomeReminderState(
-            reminders: [
-              ReminderItem(
-                id: '1',
-                title: 'ব্লাড প্রেশারের ওষুধ গ্রহণ',
-                notes: 'খাওয়ার পর কুসুম গরম পানি দিয়ে',
-                dueAt: DateTime.now().subtract(const Duration(minutes: 45)),
-                category: ReminderCategory.medicine,
-                priority: ReminderPriority.important,
-                repeatRule: 'প্রতিদিন সকাল ৮:০০',
-                isOverdue: true,
-              ),
-              ReminderItem(
-                id: '2',
-                title: 'Doctor appointment with Mom',
-                notes: 'Specialist consultation at Square Hospital',
-                dueAt: DateTime.now().add(const Duration(hours: 3)),
-                category: ReminderCategory.personal,
-                priority: ReminderPriority.important,
-              ),
-              ReminderItem(
-                id: '3',
-                title: 'বিদ্যুৎ ও ইন্টারনেট বিল পরিশোধ',
-                dueAt: DateTime.now().add(const Duration(hours: 5)),
-                category: ReminderCategory.bill,
-                repeatRule: 'প্রতি মাসের ১০ তারিখ',
-              ),
-              ReminderItem(
-                id: '4',
-                title: 'Q4 Product Roadmap Sync with Team',
-                dueAt: DateTime.now().add(const Duration(hours: 7)),
-                category: ReminderCategory.work,
-                repeatRule: 'Weekly on Friday',
-              ),
-            ],
+          const HomeReminderState(
+            reminders: [], // Zero demo data: Starts pristine and clean
+            isLoading: false,
           ),
         );
 
-  void toggleDone(String id) {
+  /// Add a newly captured reminder
+  void addReminder(ReminderItem item) {
     state = state.copyWith(
-      reminders: state.reminders.map((r) {
-        if (r.id == id) {
-          return r.copyWith(isDone: !r.isDone, isOverdue: false);
-        }
-        return r;
-      }).toList(),
+      reminders: [...state.reminders, item],
     );
   }
 
+  /// Update an existing reminder
+  void updateReminder(ReminderItem item) {
+    state = state.copyWith(
+      reminders: state.reminders.map((r) => r.id == item.id ? item : r).toList(),
+    );
+  }
+
+  /// Snooze reminder by given duration
   void snooze(String id, Duration duration) {
     state = state.copyWith(
       reminders: state.reminders.map((r) {
         if (r.id == id) {
           return r.copyWith(
-            dueAt: DateTime.now().add(duration),
+            dueAt: r.dueAt.add(duration),
             isOverdue: false,
           );
         }
@@ -98,32 +70,33 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     );
   }
 
-  void addReminder(ReminderItem item) {
-    state = state.copyWith(
-      reminders: [item, ...state.reminders],
-    );
-  }
-
-  void updateReminder(ReminderItem updatedItem) {
+  /// Toggle task completion status
+  void toggleDone(String id) {
     state = state.copyWith(
       reminders: state.reminders.map((r) {
-        if (r.id == updatedItem.id) {
-          return updatedItem;
+        if (r.id == id) {
+          return r.copyWith(isDone: !r.isDone);
         }
         return r;
       }).toList(),
     );
   }
 
+  /// Delete a reminder
   void deleteReminder(String id) {
     state = state.copyWith(
       reminders: state.reminders.where((r) => r.id != id).toList(),
     );
   }
+
+  /// Clear all reminders
+  void clearAll() {
+    state = state.copyWith(reminders: []);
+  }
 }
 
+/// Riverpod provider for Home reminders
 final homeReminderProvider =
     StateNotifierProvider<HomeReminderNotifier, HomeReminderState>((ref) {
   return HomeReminderNotifier();
 });
-
