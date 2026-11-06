@@ -141,53 +141,11 @@ git commit -m "feat(server): implement FastAPI application shell, RFC 7807 error
   - `get_db() -> AsyncGenerator[AsyncSession, None]` dependency.
   - SQLAlchemy models: `User`, `EncryptedReminder`, `EncryptedVaultItem`.
 
-- [ ] **Step 1: Write failing test for models and session initialization**
-
-```python
-# apps/server/tests/db/test_models.py
-import pytest
-from sqlalchemy import select
-from app.db.base import Base
-from app.models.user import User, PlanTier
-from app.models.reminder import EncryptedReminder
-from app.models.vault import EncryptedVaultItem
-from uuid import uuid4
-
-def test_models_instantiation():
-    user = User(
-        email="test@pingo.app",
-        password_hash="argon2id$hashed",
-        plan_tier=PlanTier.FREE,
-        client_salt="salt128bit"
-    )
-    reminder = EncryptedReminder(
-        user_id=user.id,
-        ciphertext="base64ciphertext",
-        iv="base64iv",
-        auth_tag="base64tag",
-        key_version=1,
-        algorithm="AES-256-GCM"
-    )
-    assert reminder.algorithm == "AES-256-GCM"
-    assert reminder.is_completed is False
-    assert reminder.version == 1
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `python3 -m pytest apps/server/tests/db/test_models.py`
-Expected: FAIL (No module named 'app.db.base')
-
-- [ ] **Step 3: Implement `Base`, `session.py`, `User`, `EncryptedReminder`, and `EncryptedVaultItem`**
-
-Create `app/db/base.py` using `DeclarativeBase`. In `session.py`, configure `create_async_engine` with `async_sessionmaker`. Define models with exact columns specified in `10_backend_architecture_spec.md`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `python3 -m pytest apps/server/tests/db/test_models.py`
-Expected: PASS
-
-- [ ] **Step 5: Commit database layer**
+- [x] **Step 1: Write failing test for models and session initialization**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement `Base`, `session.py`, `User`, `EncryptedReminder`, and `EncryptedVaultItem`**
+- [x] **Step 4: Run test to verify it passes**
+- [x] **Step 5: Commit database layer**
 
 ```bash
 git add apps/server/app/db/ apps/server/app/models/ apps/server/tests/db/
