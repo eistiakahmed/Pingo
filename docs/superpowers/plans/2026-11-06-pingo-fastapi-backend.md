@@ -171,73 +171,11 @@ git commit -m "feat(server): define SQLAlchemy 2.0 async database models for zer
   - `POST /api/v1/ai/parse-reminder` -> `ParseReminderResponse`
   - `AIService.parse_reminder(request: ParseReminderRequest) -> ParsedReminderData`
 
-- [ ] **Step 1: Write failing test for AI Parsing endpoint with mocked Gemini client**
-
-```python
-# apps/server/tests/api/test_ai_endpoint.py
-import pytest
-from httpx import AsyncClient, ASGITransport
-from unittest.mock import patch, AsyncMock
-from app.main import app
-
-@pytest.mark.asyncio
-async def test_parse_reminder_bengali_success():
-    mock_parsed_data = {
-        "title": "ডাক্তারের কাছে যাওয়া",
-        "due_at": "2026-11-07T11:00:00Z",
-        "category": "MEDICINE",
-        "priority": "HIGH",
-        "confidence": 0.98
-    }
-
-    with patch("app.services.ai_service.AIService.parse_reminder", new_callable=AsyncMock) as mock_service:
-        mock_service.return_value = mock_parsed_data
-
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            response = await ac.post(
-                "/api/v1/ai/parse-reminder",
-                json={
-                    "text": "কাল বিকাল ৫টায় ডাক্তারের কাছে যেতে হবে",
-                    "timezone": "Asia/Dhaka",
-                    "reference_date": "2026-11-06T15:00:00Z"
-                }
-            )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["data"]["title"] == "ডাক্তারের কাছে যাওয়া"
-        assert data["data"]["category"] == "MEDICINE"
-        assert data["data"]["priority"] == "HIGH"
-
-@pytest.mark.asyncio
-async def test_parse_reminder_missing_api_key_returns_503():
-    with patch("app.services.ai_service.AIService.parse_reminder", side_effect=RuntimeError("GEMINI_API_KEY is not configured")):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            response = await ac.post(
-                "/api/v1/ai/parse-reminder",
-                json={"text": "Doctor appointment", "timezone": "UTC"}
-            )
-        assert response.status_code == 503
-        data = response.json()
-        assert data["title"] == "AI Service Unavailable"
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `python3 -m pytest apps/server/tests/api/test_ai_endpoint.py`
-Expected: FAIL (Endpoint /api/v1/ai/parse-reminder not found 404)
-
-- [ ] **Step 3: Implement `AIService` and `/api/v1/ai/parse-reminder` router**
-
-Create `app/schemas/ai.py` with Pydantic request and response models. Implement `AIService` utilizing the Gemini API with structured JSON output schema and multilingual prompting. Mount router in `app/api/v1/api.py`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `python3 -m pytest apps/server/tests/api/test_ai_endpoint.py`
-Expected: PASS
-
-- [ ] **Step 5: Commit AI Gateway module**
+- [x] **Step 1: Write failing test for AI Parsing endpoint with mocked Gemini client**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement `AIService` and `/api/v1/ai/parse-reminder` router**
+- [x] **Step 4: Run test to verify it passes**
+- [x] **Step 5: Commit AI Gateway module**
 
 ```bash
 git add apps/server/app/schemas/ai.py apps/server/app/services/ai_service.py apps/server/app/api/v1/endpoints/ai.py apps/server/tests/api/test_ai_endpoint.py
