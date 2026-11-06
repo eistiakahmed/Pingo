@@ -33,3 +33,4 @@ async def test_ai_service_gemini_call(monkeypatch):
         assert result.category == ReminderCategory.WORK
         assert result.priority == ReminderPriority.NORMAL
         assert result.confidence == 0.95
+

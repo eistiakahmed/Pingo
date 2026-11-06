@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.security import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.sync import (
     SyncPullResponse,
     SyncPushRequest,
@@ -23,9 +24,11 @@ router = APIRouter()
 )
 async def push_sync(
     request: SyncPushRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SyncPushResponse:
-    """Batch upserts client-encrypted reminders and vault items without plaintext."""
+    """Batch upserts client-encrypted reminders and vault items for authenticated user."""
+    request.user_id = current_user.id
     return await SyncService.apply_push(db=db, request=request)
 
 
@@ -37,11 +40,11 @@ async def push_sync(
     tags=["Sync"],
 )
 async def pull_sync(
-    user_id: UUID = Query(description="Authenticated user UUID"),
     since: Optional[datetime] = Query(
         default=None, description="ISO 8601 timestamp for delta query"
     ),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SyncPullResponse:
-    """Returns encrypted reminders and vault items updated since the given timestamp."""
-    return await SyncService.pull_delta(db=db, user_id=user_id, since=since)
+    """Returns encrypted reminders and vault items updated since the given timestamp for authenticated user."""
+    return await SyncService.pull_delta(db=db, user_id=current_user.id, since=since)

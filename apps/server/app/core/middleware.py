@@ -27,3 +27,4 @@ def setup_middlewares(app: FastAPI, settings: Settings) -> None:
         allow_headers=["*"],
     )
     app.add_middleware(SecurityHeadersMiddleware)
+

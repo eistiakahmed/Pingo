@@ -59,3 +59,4 @@ class EncryptedReminder(Base):
         Index("ix_encrypted_reminders_user_updated", "user_id", "updated_at"),
         Index("ix_encrypted_reminders_due_active", "due_at", "is_completed"),
     )
+

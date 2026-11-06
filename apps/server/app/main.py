@@ -45,3 +45,4 @@ async def root():
         "health": "/health",
         "api_v1": settings.API_V1_PREFIX,
     }
+

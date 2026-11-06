@@ -60,3 +60,4 @@ class ParsedReminderData(BaseModel):
 class ParseReminderResponse(BaseModel):
     success: bool = True
     data: ParsedReminderData
+

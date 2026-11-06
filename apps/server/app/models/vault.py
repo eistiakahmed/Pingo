@@ -52,3 +52,4 @@ class EncryptedVaultItem(Base):
     __table_args__ = (
         Index("ix_encrypted_vault_user_updated", "user_id", "updated_at"),
     )
+

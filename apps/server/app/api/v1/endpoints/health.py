@@ -18,3 +18,4 @@ async def get_health():
         service="pingo-backend",
         version="1.0.0",
     )
+

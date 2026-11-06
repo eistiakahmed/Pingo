@@ -59,3 +59,4 @@ class AIService:
 
         parsed_dict = json.loads(response.text)
         return ParsedReminderData(**parsed_dict)
+

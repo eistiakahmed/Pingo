@@ -56,7 +56,7 @@ class EncryptedVaultDTO(BaseModel):
 
 
 class SyncPushRequest(BaseModel):
-    user_id: UUID
+    user_id: Optional[UUID] = None
     reminders: List[EncryptedReminderDTO] = Field(
         default_factory=list,
         max_length=500,
@@ -83,3 +83,4 @@ class SyncPullResponse(BaseModel):
     server_timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+

@@ -81,3 +81,4 @@ def downgrade() -> None:
     op.drop_table("encrypted_reminders")
     op.drop_table("users")
     op.execute("DROP TYPE plantier")
+

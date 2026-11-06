@@ -39,3 +39,4 @@ class User(Base):
     vault_items: Mapped[list["EncryptedVaultItem"]] = relationship(  # type: ignore[name-defined]
         back_populates="user", cascade="all, delete-orphan"
     )
+

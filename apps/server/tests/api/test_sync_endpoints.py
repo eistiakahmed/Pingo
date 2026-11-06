@@ -2,11 +2,32 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 import pytest
 from httpx import ASGITransport, AsyncClient
+from app.core.security import get_current_user
+from app.db.session import get_db
 from app.main import app
+from app.models.user import PlanTier, User
+
+
+@pytest.fixture
+def mock_authenticated_user():
+    user = User(
+        id=uuid4(),
+        email="auth_user@pingo.app",
+        password_hash="argon2id$hashed",
+        plan_tier=PlanTier.FREE,
+        client_salt="mock_salt_12345",
+    )
+    async def override_db():
+        yield AsyncMock()
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = override_db
+    yield user
+    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
-async def test_sync_push_success():
+async def test_sync_push_success(mock_authenticated_user):
     mock_push_result = {
         "success": True,
         "applied_count": 1,
@@ -24,8 +45,8 @@ async def test_sync_push_success():
         ) as ac:
             response = await ac.post(
                 "/api/v1/sync/push",
+                headers={"Authorization": "Bearer fake-token"},
                 json={
-                    "user_id": str(uuid4()),
                     "reminders": [
                         {
                             "id": str(uuid4()),
@@ -49,7 +70,7 @@ async def test_sync_push_success():
 
 
 @pytest.mark.asyncio
-async def test_sync_pull_success():
+async def test_sync_pull_success(mock_authenticated_user):
     mock_pull_result = {
         "reminders": [],
         "vault_items": [],
@@ -67,10 +88,21 @@ async def test_sync_pull_success():
         ) as ac:
             response = await ac.get(
                 "/api/v1/sync/pull",
-                params={"user_id": str(uuid4())},
+                headers={"Authorization": "Bearer fake-token"},
             )
 
         assert response.status_code == 200
         data = response.json()
         assert "reminders" in data
         assert "server_timestamp" in data
+
+
+@pytest.mark.asyncio
+async def test_sync_unauthorized_without_token():
+    app.dependency_overrides.clear()
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.get("/api/v1/sync/pull")
+    assert response.status_code == 401
+    assert response.json()["title"] == "Unauthorized"

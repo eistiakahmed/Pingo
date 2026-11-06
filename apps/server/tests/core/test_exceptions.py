@@ -12,3 +12,4 @@ async def test_rfc7807_validation_error_format():
     data = response.json()
     assert "title" in data
     assert "status" in data
+

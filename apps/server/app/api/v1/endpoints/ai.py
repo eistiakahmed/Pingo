@@ -1,5 +1,6 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from app.core.exceptions import AppException
+from app.core.rate_limit import check_ai_rate_limit
 from app.schemas.ai import ParseReminderRequest, ParseReminderResponse
 from app.services.ai_service import AIService
 
@@ -12,6 +13,7 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
     summary="Parse natural language reminder into structured entity",
     tags=["AI Gateway"],
+    dependencies=[Depends(check_ai_rate_limit)],
 )
 async def parse_reminder(request: ParseReminderRequest) -> ParseReminderResponse:
     """Parses natural language input (English, Bengali, Banglish) using Gemini API."""

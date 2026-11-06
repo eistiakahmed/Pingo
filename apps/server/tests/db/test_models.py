@@ -43,3 +43,4 @@ def test_models_instantiation():
     assert reminder.version == 1
     assert vault_item.item_type == "NOTE"
     assert vault_item.version == 1
+

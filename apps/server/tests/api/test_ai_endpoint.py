@@ -57,3 +57,4 @@ async def test_parse_reminder_missing_api_key_returns_503():
         assert response.status_code == 503
         data = response.json()
         assert data["title"] == "AI Service Unavailable"
+

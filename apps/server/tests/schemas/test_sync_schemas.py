@@ -41,3 +41,4 @@ def test_batch_size_flood_prevention():
     # Creating 501 items exceeds max limit of 500
     with pytest.raises(ValidationError):
         SyncPushRequest(reminders=[dto] * 501, vault_items=[])
+

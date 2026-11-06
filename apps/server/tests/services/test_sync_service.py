@@ -52,3 +52,4 @@ async def test_sync_service_applies_push_with_lww():
     assert response.applied_count == 1
     assert existing_reminder.ciphertext == "bmV3X2NpcGhlcnRleHQ="
     assert existing_reminder.version == 2
+

@@ -21,3 +21,4 @@ async def test_openapi_docs_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert data["info"]["title"] == "Pingo API Gateway"
+

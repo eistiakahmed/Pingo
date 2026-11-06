@@ -173,3 +173,4 @@ class SyncService:
             vault_items=vault_items,
             server_timestamp=now,
         )
+
