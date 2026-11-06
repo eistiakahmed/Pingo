@@ -225,38 +225,10 @@ git commit -m "feat(sync): implement zero-knowledge sync push and pull endpoints
 - Consumes: Complete running FastAPI application.
 - Produces: 100% passing tests for Health, AI parsing, and Zero-Knowledge Sync with clean reports.
 
-- [ ] **Step 1: Write comprehensive end-to-end integration test**
-
-```python
-# apps/server/tests/e2e/test_full_workflow.py
-import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-
-@pytest.mark.asyncio
-async def test_complete_e2e_flow():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        # 1. Health Check
-        health = await ac.get("/health")
-        assert health.status_code == 200
-
-        # 2. OpenAPI Schema availability
-        openapi = await ac.get("/openapi.json")
-        assert openapi.status_code == 200
-        assert "/api/v1/ai/parse-reminder" in openapi.json()["paths"]
-        assert "/api/v1/sync/push" in openapi.json()["paths"]
-```
-
-- [ ] **Step 2: Run full test suite across server and crypto engine**
-
-Run: `python3 -m pytest apps/server/tests packages/e2ee_py/tests -v`
-Expected: ALL TESTS PASS
-
-- [ ] **Step 3: Update `apps/server/README.md` with setup and execution instructions**
-
-Document virtual environment creation, installation of requirements, running migrations, and launching Uvicorn (`uvicorn app.main:app --reload --port 8000`).
-
-- [ ] **Step 4: Commit documentation and complete verification**
+- [x] **Step 1: Write comprehensive end-to-end integration test**
+- [x] **Step 2: Run full test suite across server and crypto engine**
+- [x] **Step 3: Update `apps/server/README.md` with setup and execution instructions**
+- [x] **Step 4: Commit documentation and complete verification**
 
 ```bash
 git add apps/server/tests/e2e/ apps/server/README.md
