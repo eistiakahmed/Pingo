@@ -2,7 +2,8 @@
 
 ## 1. Overview
 This specification documents the complete implementation of Pingo's final UI design system, grounded directly in the 13 reference screens from `Pingo UI Redesign-png`:
-1. **Home Screen (`1. Home.png`)**: Pristine hero greeting, animated pulsing voice trigger, suggestion chips, and bottom input dock.
+1. **Home Screen (`1. Home.png`)**: Pristine hero greeting, animated pulsing voice trigger, 
+suggestion chips, and bottom input dock.
 2. **Auto Saved Flow (`2. Auto saved.png`)**: Conversation session showing purple user bubbles and clean, structured white Pingo cards with `✓ Saved automatically`, timestamps, and `Undo this change`.
 3. **Ask About Today (`3. Ask about today.png`)**: Interactive checklist card showing remaining tasks with circular status toggles and strikethroughs.
 4. **Voice Recording Screen (`4. Voice.png`)**: Dedicated listening overlay with language toggle (`English + বাংলা`), animated concentric soundwave/ripple rings, live speech transcription, and controls (`Cancel`, `Stop`, `Type`).
