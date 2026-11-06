@@ -29,9 +29,11 @@ async def parse_reminder(request: ParseReminderRequest) -> ParseReminderResponse
             type_url="https://api.pingo.app/errors/ai-unavailable",
         )
     except Exception as e:
+        # Avoid leaking internal stack trace or API credentials to client
         raise AppException(
             title="AI Extraction Failed",
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to process natural language input: {str(e)}",
+            detail="Failed to process natural language input. Please verify your request and try again.",
             type_url="https://api.pingo.app/errors/ai-processing-error",
         )
+

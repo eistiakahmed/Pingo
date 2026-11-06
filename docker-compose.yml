@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pingo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pingo_db
+      POSTGRES_USER: pingo_user
+      POSTGRES_PASSWORD: pingo_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pingo_user -d pingo_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: pingo-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: "Pingo API Gateway"
+      APP_ENV: "development"
+      PORT: 8000
+      HOST: "0.0.0.0"
+      DATABASE_URL: "postgresql+asyncpg://pingo_user:pingo_password@postgres:5432/pingo_db"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      SECRET_KEY: "${SECRET_KEY:-pingo-development-secret-key-at-least-32-chars-long}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./apps/server/app:/app/app
+      - ./apps/server/alembic:/app/alembic
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  postgres_data:
