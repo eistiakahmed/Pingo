@@ -1,189 +1,156 @@
-# Specification: Pingo Backend AI Gateway & Sync Service
+# Specification: Pingo Backend AI Gateway & Sync Service (FastAPI)
 
 ## 1. Executive Summary & Purpose
-The Pingo Backend Service (`apps/server`) serves as the secure, thin cloud companion for the Pingo mobile app. Following the **Offline-First** and **Private-by-Default** principles outlined in `🔔 Pingo.md`:
+The Pingo Backend Service (`apps/server`) serves as the secure, high-performance cloud companion for the Pingo mobile app. Following the **Offline-First**, **AI-Native**, and **Private-by-Default (Zero-Knowledge)** principles:
 - Secrets (Gemini API keys, database credentials) are strictly kept on the server and never exposed to the client.
-- Provides low-latency NLP parsing for English, Bangla, and Banglish input into structured reminder JSON.
-- Provides encrypted cloud sync and backup for authenticated user reminders and document metadata.
+- Provides low-latency NLP parsing for English, Bangla, and Banglish input into structured reminder JSON via Google Gemini API.
+- Provides encrypted zero-knowledge cloud sync and backup for authenticated user reminders and document metadata (`ciphertext`, `iv`, `authTag`, `keyVersion`).
+- Generates automatic interactive OpenAPI documentation (`/docs`) accessible for frontend integration and client schema generation.
 
 ---
 
 ## 2. Technology Stack & Architectural Standards
-- **Runtime & Language**: Node.js (v22 / v20 LTS) with TypeScript (`strict: true`).
-- **Web Framework**: Express.js with modular Clean Architecture (`routes/`, `controllers/`, `services/`, `middlewares/`, `config/`).
-- **Validation**: **Zod** on all system boundaries (HTTP request bodies, query params, and `.env` variables).
-- **ORM & Database**: **Prisma ORM** targeting PostgreSQL with explicit foreign keys, indexes, audit timestamps (`createdAt`, `updatedAt`, `deletedAt`), and migration safety.
-- **AI Integration**: Google Gemini API (`@google/genai` or `@google/generative-ai`) utilizing JSON schema mode for deterministic output.
+- **Runtime & Language**: Python 3.12+ with strict type hints (`mypy` / `pyright` compliant).
+- **Web Framework**: **FastAPI** with ASGI runner (`uvicorn`).
+- **Validation & Serialization**: **Pydantic v2** (`pydantic-settings` for `.env` config, `BaseModel` for schemas).
+- **ORM & Database**: **SQLAlchemy 2.0 (Async)** targeting PostgreSQL with `asyncpg`, managed by **Alembic** migrations. Includes explicit foreign keys, composite indexes, audit timestamps (`created_at`, `updated_at`, `deleted_at`), and ACID compliance.
+- **AI Integration**: Google Gemini API via official `google-genai` Python SDK with structured JSON output schema mode.
 - **Security & Ops**:
-  - `helmet` for HTTP security headers.
-  - `cors` with explicit client origin whitelist.
-  - `express-rate-limit` for DDoS / brute-force protection.
-  - Centralized typed error handler with RFC 7807 Problem Details.
+  - CORS middleware with strict origin whitelist.
+  - Rate limiting (slowapi / redis-ready) for DDoS / brute-force protection.
+  - Centralized RFC 7807 Problem Details exception handlers.
+  - Non-root execution and Docker containerization readiness.
 
 ---
 
-## 3. Core Database Schemas (Prisma)
+## 3. Database Schema Models (SQLAlchemy 2.0 Async)
 
-```prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+```python
+import enum
+from datetime import datetime
+from uuid import UUID, uuid4
+from sqlalchemy import String, Text, Boolean, Integer, DateTime, ForeignKey, Index, Enum
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-generator client {
-  provider = "prisma-client-js"
-}
+class Base(DeclarativeBase):
+    pass
 
-enum PlanTier {
-  FREE
-  PRO
-}
+class PlanTier(str, enum.Enum):
+    FREE = "FREE"
+    PRO = "PRO"
 
-enum ReminderCategory {
-  GENERAL
-  MEDICINE
-  BILL
-  WORK
-  PERSONAL
-  BIRTHDAY
-}
+class User(Base):
+    __tablename__ = "users"
 
-enum ReminderPriority {
-  NORMAL
-  IMPORTANT
-  URGENT
-}
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    plan_tier: Mapped[PlanTier] = mapped_column(Enum(PlanTier), default=PlanTier.FREE, nullable=False)
+    client_salt: Mapped[str] = mapped_column(String(128), nullable=False) # For client-side E2EE derivation
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-model User {
-  id            String         @id @default(uuid())
-  phoneNumber   String?        @unique
-  email         String?        @unique
-  fullName      String?
-  avatarUrl     String?
-  plan          PlanTier       @default(FREE)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  deletedAt     DateTime?
+    reminders: Mapped[list["EncryptedReminder"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    vault_items: Mapped[list["EncryptedVaultItem"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
-  reminders     Reminder[]
-  vaultItems    VaultItem[]
+class EncryptedReminder(Base):
+    __tablename__ = "encrypted_reminders"
 
-  @@index([email])
-  @@index([phoneNumber])
-}
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Zero-Knowledge Cryptographic Envelope
+    ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    iv: Mapped[str] = mapped_column(String(64), nullable=False)
+    auth_tag: Mapped[str] = mapped_column(String(64), nullable=False)
+    key_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    algorithm: Mapped[str] = mapped_column(String(32), default="AES-256-GCM", nullable=False)
 
-model Reminder {
-  id            String            @id @default(uuid())
-  userId        String
-  clientLocalId String?           // ID generated on device during offline creation
-  title         String
-  notes         String?
-  dueAt         DateTime
-  originalTz    String            @default("Asia/Dhaka")
-  category      ReminderCategory  @default(GENERAL)
-  priority      ReminderPriority  @default(NORMAL)
-  repeatRule    String?           // e.g. "FREQ=DAILY;BYHOUR=21"
-  isDone        Boolean           @default(false)
-  completedAt   DateTime?
-  version       Int               @default(1)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  deletedAt     DateTime?         // Soft delete for reliable two-way sync
+    # Server-known query metadata for Push Notifications only (No text!)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True) # Soft delete for sync
 
-  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user: Mapped["User"] = relationship(back_populates="reminders")
 
-  @@unique([userId, clientLocalId])
-  @@index([userId, dueAt])
-  @@index([userId, isDone])
-}
+    __table_args__ = (
+        Index("ix_encrypted_reminders_user_updated", "user_id", "updated_at"),
+        Index("ix_encrypted_reminders_due_active", "due_at", "is_completed"),
+    )
 
-model VaultItem {
-  id            String         @id @default(uuid())
-  userId        String
-  clientLocalId String?
-  title         String
-  category      String         // "Identity", "Finance", "Health", "Education"
-  expiresAt     DateTime?
-  reminderDays  Int[]          // e.g. [90, 30, 7]
-  fileUrl       String?        // Encrypted blob URL
-  fileHash      String?
-  metadataJson  Json?
-  version       Int            @default(1)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  deletedAt     DateTime?
+class EncryptedVaultItem(Base):
+    __tablename__ = "encrypted_vault_items"
 
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_type: Mapped[str] = mapped_column(String(32), nullable=False) # NOTE, CARD, PASSWORD, DOCUMENT
 
-  @@unique([userId, clientLocalId])
-  @@index([userId, expiresAt])
-}
+    # Zero-Knowledge Cryptographic Envelope
+    ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    iv: Mapped[str] = mapped_column(String(64), nullable=False)
+    auth_tag: Mapped[str] = mapped_column(String(64), nullable=False)
+    key_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    algorithm: Mapped[str] = mapped_column(String(32), default="AES-256-GCM", nullable=False)
+
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship(back_populates="vault_items")
+
+    __table_args__ = (
+        Index("ix_encrypted_vault_user_updated", "user_id", "updated_at"),
+    )
 ```
 
 ---
 
-## 4. API Endpoint Contracts
+## 4. API Endpoints Specification
 
-### 4.1 AI Natural Language Reminder Extraction
-- **Endpoint**: `POST /api/v1/ai/parse-reminder`
-- **Request Body**:
-```json
-{
-  "text": "Kal bikel 5tay mayer sathe doctor",
-  "clientTimestamp": "2026-11-06T17:00:00.000Z",
-  "timeZone": "Asia/Dhaka",
-  "language": "bn-BD"
-}
-```
-- **Response** (`200 OK`):
-```json
-{
-  "success": true,
-  "data": {
-    "title": "Doctor appointment with Mom",
-    "dueAt": "2026-11-07T11:00:00.000Z",
-    "localTimeFormatted": "Sat, Nov 7 at 5:00 PM",
-    "category": "PERSONAL",
-    "priority": "IMPORTANT",
-    "repeatRule": null,
-    "confidence": 0.96,
-    "needsClarification": false
-  }
-}
-```
+### 4.1 System & Health
+- `GET /health` -> `{"status": "healthy", "service": "pingo-backend", "version": "1.0.0"}`
 
-### 4.2 Document Expiry & Date Extraction
-- **Endpoint**: `POST /api/v1/ai/extract-document-dates`
-- **Request Body**:
-```json
-{
-  "ocrText": "PASSPORT OF BANGLADESH ... EXPIRY DATE: 14 AUG 2029 ...",
-  "documentType": "PASSPORT"
-}
-```
-- **Response** (`200 OK`):
-```json
-{
-  "success": true,
-  "data": {
-    "detectedType": "Passport",
-    "category": "Identity",
-    "expiryDate": "2029-08-14T00:00:00.000Z",
-    "suggestedReminders": [
-      { "offsetDays": 90, "targetDate": "2029-05-16T00:00:00.000Z" },
-      { "offsetDays": 30, "targetDate": "2029-07-15T00:00:00.000Z" },
-      { "offsetDays": 7, "targetDate": "2029-08-07T00:00:00.000Z" }
-    ],
-    "confidence": 0.98
-  }
-}
-```
+### 4.2 AI Gateway Module (`/api/v1/ai`)
+- `POST /api/v1/ai/parse-reminder`
+  - **Request Body (Pydantic)**:
+    ```json
+    {
+      "text": "কাল সকাল ৯টায় ডেন্টিস্টের কাছে যেতে হবে",
+      "timezone": "Asia/Dhaka",
+      "reference_date": "2026-11-06T15:00:00Z"
+    }
+    ```
+  - **Gemini System Instruction**:
+    - Extract title, due date/time (ISO 8601 UTC based on user timezone and relative words like "কাল", "পরশু", "tomorrow", "next Monday"), category (`GENERAL`, `MEDICINE`, `BILL`, `WORK`, `PERSONAL`, `BIRTHDAY`), priority (`NORMAL`, `HIGH`, `URGENT`), and confidence score (0.0 - 1.0).
+  - **Response Body (`200 OK`)**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "title": "Dentist Appointment",
+        "due_at": "2026-11-07T03:00:00Z",
+        "category": "MEDICINE",
+        "priority": "HIGH",
+        "confidence": 0.95
+      }
+    }
+    ```
 
-### 4.3 Authentication
-- `POST /api/v1/auth/request-otp`: Sends 6-digit verification code.
-- `POST /api/v1/auth/verify-otp`: Validates code, creates or fetches user, returns JWT.
+### 4.3 Zero-Knowledge Sync Module (`/api/v1/sync`)
+- `POST /api/v1/sync/push`
+  - Accepts batch of encrypted reminders and vault items with client versioning.
+  - Server performs upsert based on `(user_id, id)`. Resolves conflict using Last-Write-Wins based on client `updated_at` / version.
+- `GET /api/v1/sync/pull?since={ISO_TIMESTAMP}`
+  - Returns delta of items modified or soft-deleted after `since`.
 
-### 4.4 Two-Way Sync
-- `POST /api/v1/sync/push`: Batch upload local offline changes.
-- `GET /api/v1/sync/pull?since=<timestamp>`: Fetch changes modified since last sync.
+---
 
+## 5. Security & Privacy Guarantees
+1. **Zero-Knowledge Core**: Server has zero decryption keys. Decryption is strictly client-side.
+2. **Key Security**: Gemini API keys never leak into logs or client responses.
+3. **Strict Validation**: All endpoints reject unrecognized fields or invalid types with RFC 7807 problem details.
