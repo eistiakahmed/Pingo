@@ -46,38 +46,11 @@
 - Consumes: Environment variables (`DATABASE_URL`, `GEMINI_API_KEY`, `APP_ENV`, `CORS_ORIGINS`).
 - Produces: `get_settings() -> Settings` delivering validated configuration singleton.
 
-- [ ] **Step 1: Write the failing test for configuration loading**
-
-```python
-# apps/server/tests/core/test_config.py
-import pytest
-from app.core.config import Settings
-
-def test_settings_load_defaults(monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://pingo:secret@localhost:5432/pingo_db")
-    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
-    settings = Settings()
-    assert settings.APP_NAME == "Pingo API Gateway"
-    assert settings.API_V1_PREFIX == "/api/v1"
-    assert settings.DATABASE_URL == "postgresql+asyncpg://pingo:secret@localhost:5432/pingo_db"
-    assert settings.GEMINI_API_KEY == "test-gemini-key"
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `python3 -m pytest apps/server/tests/core/test_config.py`
-Expected: FAIL (ModuleNotFoundError: No module named 'app')
-
-- [ ] **Step 3: Implement dependencies and `Settings` in `apps/server/app/core/config.py`**
-
-Define `requirements.txt` containing `fastapi`, `uvicorn[standard]`, `pydantic>=2.7.0`, `pydantic-settings>=2.2.0`, `sqlalchemy>=2.0.30`, `asyncpg`, `google-genai`, `alembic`, `httpx`, `pytest`, `pytest-asyncio`. Implement `Settings` inheriting from `pydantic_settings.BaseSettings` with default values and validation.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `python3 -m pytest apps/server/tests/core/test_config.py`
-Expected: PASS
-
-- [ ] **Step 5: Commit scaffolding**
+- [x] **Step 1: Write the failing test for configuration loading**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement dependencies and `Settings` in `apps/server/app/core/config.py`**
+- [x] **Step 4: Run test to verify it passes**
+- [x] **Step 5: Commit scaffolding**
 
 ```bash
 git add apps/server/requirements.txt apps/server/pyproject.toml apps/server/.env.example apps/server/app/core/config.py apps/server/tests/core/test_config.py
