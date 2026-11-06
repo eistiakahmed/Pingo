@@ -201,54 +201,11 @@ git commit -m "feat(ai): implement Gemini NLP reminder extraction gateway with m
   - `POST /api/v1/sync/push` -> `SyncPushResponse(success: bool, applied_count: int, server_timestamp: datetime)`
   - `GET /api/v1/sync/pull` -> `SyncPullResponse(reminders: List[EncryptedReminderDTO], vault_items: List[EncryptedVaultDTO])`
 
-- [ ] **Step 1: Write failing test for Base64 Cryptographic validation and Sync Push**
-
-```python
-# apps/server/tests/schemas/test_sync_schemas.py
-import pytest
-from pydantic import ValidationError
-from app.schemas.sync import EncryptedReminderDTO
-from uuid import uuid4
-
-def test_valid_encrypted_envelope_dto():
-    dto = EncryptedReminderDTO(
-        id=uuid4(),
-        ciphertext="ZXhhbXBsZWNpcGhlcnRleHQ=",
-        iv="MDEyMzQ1Njc4OWFi",
-        auth_tag="YWJjZGVmZ2hpamtsbW5vcA==",
-        key_version=1,
-        version=1
-    )
-    assert dto.algorithm == "AES-256-GCM"
-    assert dto.is_completed is False
-
-def test_invalid_base64_ciphertext_rejected():
-    with pytest.raises(ValidationError):
-        EncryptedReminderDTO(
-            id=uuid4(),
-            ciphertext="not-valid-base64!@#$",
-            iv="MDEyMzQ1Njc4OWFi",
-            auth_tag="YWJjZGVmZ2hpamtsbW5vcA==",
-            key_version=1,
-            version=1
-        )
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `python3 -m pytest apps/server/tests/schemas/test_sync_schemas.py`
-Expected: FAIL (Cannot import 'EncryptedReminderDTO')
-
-- [ ] **Step 3: Implement `app/schemas/sync.py`, `SyncService`, and `/api/v1/sync` router**
-
-Define `EncryptedReminderDTO` and `EncryptedVaultDTO` enforcing Base64 formatting and length constraints. Implement batch upsert and Last-Write-Wins delta resolution in `SyncService`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `python3 -m pytest apps/server/tests/schemas/test_sync_schemas.py apps/server/tests/api/test_sync_endpoints.py`
-Expected: PASS
-
-- [ ] **Step 5: Commit Zero-Knowledge Sync module**
+- [x] **Step 1: Write failing test for Base64 Cryptographic validation and Sync Push**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement `app/schemas/sync.py`, `SyncService`, and `/api/v1/sync` router**
+- [x] **Step 4: Run test to verify it passes**
+- [x] **Step 5: Commit Zero-Knowledge Sync module**
 
 ```bash
 git add apps/server/app/schemas/sync.py apps/server/app/services/sync_service.py apps/server/app/api/v1/endpoints/sync.py apps/server/tests/schemas/ apps/server/tests/api/test_sync_endpoints.py
