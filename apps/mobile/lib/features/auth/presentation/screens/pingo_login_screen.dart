@@ -1,11 +1,52 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
 import 'package:pingo_mobile/features/auth/presentation/screens/pingo_signup_screen.dart';
+import 'package:pingo_mobile/features/auth/presentation/state/auth_provider.dart';
 import 'package:pingo_mobile/features/home/presentation/screens/pingo_home_screen.dart';
 
-/// Screen implementing '5. Log in.png'.
-class PingoLoginScreen extends StatelessWidget {
+/// Screen implementing '5. Log in.png' connected to Pingo API.
+class PingoLoginScreen extends ConsumerStatefulWidget {
   const PingoLoginScreen({super.key});
+
+  @override
+  ConsumerState<PingoLoginScreen> createState() => _PingoLoginScreenState();
+}
+
+class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
+    final success = await ref.read(authProvider.notifier).login(
+      email: email,
+      password: password,
+    );
+
+    if (success && mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const PingoHomeScreen()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,16 +56,17 @@ class PingoLoginScreen extends StatelessWidget {
     final borderColor = isDark ? AppColors.darkBorder : AppColors.pingoBorder;
     final textColor = isDark ? Colors.white : AppColors.pingoDark;
     final mutedColor = isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted;
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 36),
+              const SizedBox(height: 24),
 
               // Bell Logo Icon in rounded square
               Align(
@@ -70,9 +112,33 @@ class PingoLoginScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
-              // Phone or email input field
+              // Error Banner if present
+              if (authState.errorMessage != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          authState.errorMessage!,
+                          style: const TextStyle(color: Colors.red, fontSize: 13.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Email input field
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
                 decoration: BoxDecoration(
@@ -80,30 +146,55 @@ class PingoLoginScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
                 ),
-                child: const TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Phone or email',
+                child: TextField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    hintText: 'Email address',
                     hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
                     border: InputBorder.none,
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
 
-              Text(
-                'We will send you a code. No password needed.',
-                style: TextStyle(fontSize: 13, color: mutedColor),
+              const SizedBox(height: 14),
+
+              // Password input field
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
+                ),
+                child: TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    hintText: 'Password',
+                    hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
+                    border: InputBorder.none,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: mutedColor,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 24),
 
               // Continue Button
               InkWell(
-                onTap: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const PingoHomeScreen()),
-                  );
-                },
+                onTap: authState.isLoading ? null : _handleLogin,
                 borderRadius: BorderRadius.circular(26),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -119,14 +210,20 @@ class PingoLoginScreen extends StatelessWidget {
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: authState.isLoading
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : const Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
 
@@ -173,7 +270,7 @@ class PingoLoginScreen extends StatelessWidget {
                 ),
               ),
 
-              const Spacer(),
+              const SizedBox(height: 36),
 
               // New to Pingo? Sign up
               Center(
@@ -224,4 +321,3 @@ class PingoLoginScreen extends StatelessWidget {
     );
   }
 }
-

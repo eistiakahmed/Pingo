@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/features/auth/presentation/state/auth_provider.dart';
 import 'package:pingo_mobile/features/onboarding/presentation/screens/pingo_permissions_screen.dart';
 
-/// Screen implementing '6. Sign up.png'.
-class PingoSignupScreen extends StatefulWidget {
+/// Screen implementing '6. Sign up.png' connected to Pingo API.
+class PingoSignupScreen extends ConsumerStatefulWidget {
   const PingoSignupScreen({super.key});
 
   static void open(BuildContext context) {
@@ -13,12 +15,52 @@ class PingoSignupScreen extends StatefulWidget {
   }
 
   @override
-  State<PingoSignupScreen> createState() => _PingoSignupScreenState();
+  ConsumerState<PingoSignupScreen> createState() => _PingoSignupScreenState();
 }
 
-class _PingoSignupScreenState extends State<PingoSignupScreen> {
+class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
   String _selectedLang = 'English';
   bool _agreed = true;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSignup() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an email and password')),
+      );
+      return;
+    }
+
+    if (!_agreed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please agree to the Terms and Privacy Policy')),
+      );
+      return;
+    }
+
+    final success = await ref.read(authProvider.notifier).register(
+      email: email,
+      password: password,
+    );
+
+    if (success && mounted) {
+      PingoPermissionsScreen.open(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,11 +69,12 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
     final cardBg = isDark ? AppColors.darkSurface : AppColors.pingoSurface;
     final textColor = isDark ? Colors.white : AppColors.pingoDark;
     final mutedColor = isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted;
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -62,7 +105,7 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
                 ),
               ),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
 
               Text(
                 'Create your account',
@@ -79,7 +122,31 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
                 style: TextStyle(fontSize: 15.5, color: mutedColor),
               ),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
+
+              // Error Banner if present
+              if (authState.errorMessage != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          authState.errorMessage!,
+                          style: const TextStyle(color: Colors.red, fontSize: 13.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
               // Your name field
               Container(
@@ -89,8 +156,9 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
                 ),
-                child: const TextField(
-                  decoration: InputDecoration(
+                child: TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
                     hintText: 'Your name',
                     hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
                     border: InputBorder.none,
@@ -98,9 +166,9 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Phone or email field
+              // Email field
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
                 decoration: BoxDecoration(
@@ -108,16 +176,51 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
                 ),
-                child: const TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Phone or email',
+                child: TextField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    hintText: 'Email address',
                     hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
                     border: InputBorder.none,
                   ),
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 14),
+
+              // Password field
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
+                ),
+                child: TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    hintText: 'Password (min 8 chars)',
+                    hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
+                    border: InputBorder.none,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: mutedColor,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
 
               Text(
                 'I speak',
@@ -127,7 +230,7 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
                   color: textColor,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               Row(
                 children: [
@@ -139,7 +242,7 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Checkbox terms
               InkWell(
@@ -178,11 +281,11 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
                 ),
               ),
 
-              const Spacer(),
+              const SizedBox(height: 28),
 
-              // Create account button -> navigates to Permissions screen
+              // Create account button
               InkWell(
-                onTap: () => PingoPermissionsScreen.open(context),
+                onTap: authState.isLoading ? null : _handleSignup,
                 borderRadius: BorderRadius.circular(26),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -198,14 +301,20 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: const Text(
-                    'Create account',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: authState.isLoading
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : const Text(
+                          'Create account',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
 
@@ -267,4 +376,3 @@ class _PingoSignupScreenState extends State<PingoSignupScreen> {
     );
   }
 }
-

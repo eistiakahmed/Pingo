@@ -20,6 +20,10 @@ dependencies:
   # State Management
   flutter_riverpod: ^2.5.1
 
+  # Networking & Cryptography
+  http: ^1.2.1
+  crypto: ^3.0.3
+
   # Utilities
   uuid: ^4.4.0
 
