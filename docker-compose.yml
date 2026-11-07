@@ -1,22 +1,4 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: pingo-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: pingo_db
-      POSTGRES_USER: pingo_user
-      POSTGRES_PASSWORD: pingo_password
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pingo_user -d pingo_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   api:
     build:
       context: .
@@ -30,21 +12,21 @@ services:
       APP_ENV: "development"
       PORT: 8000
       HOST: "0.0.0.0"
-      DATABASE_URL: "postgresql+asyncpg://pingo_user:pingo_password@postgres:5432/pingo_db"
+      DATABASE_URL: "${DATABASE_URL:-postgresql+asyncpg://pingo_user:pingo_password@dd-postgres:5432/pingo_db}"
       AI_PROVIDER: "${AI_PROVIDER:-deepseek}"
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
       SECRET_KEY: "${SECRET_KEY:-pingo-development-secret-key-at-least-32-chars-long}"
-    depends_on:
-      postgres:
-        condition: service_healthy
     volumes:
       - ./apps/server/app:/app/app
       - ./apps/server/alembic:/app/alembic
+    networks:
+      - dokaandigit_net
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app"
 
-volumes:
-  postgres_data:
-
+networks:
+  dokaandigit_net:
+    external: true
+    name: dokaandigit-full-monorepo_default

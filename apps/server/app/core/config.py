@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://pingo:secret@localhost:5432/pingo_db",
+        default="postgresql+asyncpg://pingo_user:pingo_password@localhost:5432/pingo_db",
         description="Async PostgreSQL connection string with asyncpg",
     )
     ECHO_SQL: bool = Field(
