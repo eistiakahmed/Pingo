@@ -1,0 +1,61 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: pingo-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN_NAME: "${DOMAIN_NAME:-localhost}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pingo-api
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      APP_ENV: "production"
+      PORT: 8000
+      HOST: "0.0.0.0"
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-pingo_user}:${POSTGRES_PASSWORD}@postgres:5432/pingo_db"
+      AI_PROVIDER: "${AI_PROVIDER:-deepseek}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      SECRET_KEY: "${SECRET_KEY}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: pingo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pingo_db
+      POSTGRES_USER: ${POSTGRES_USER:-pingo_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pingo_user} -d pingo_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_prod_data:
+  caddy_data:
+  caddy_config:
