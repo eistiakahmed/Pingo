@@ -18,7 +18,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: apps/server/Dockerfile
     container_name: pingo-api
     restart: unless-stopped
     expose:
@@ -59,3 +59,4 @@ volumes:
   postgres_prod_data:
   caddy_data:
   caddy_config:
+
