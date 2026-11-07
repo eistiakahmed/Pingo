@@ -23,6 +23,8 @@ async def parse_reminder(request: ParseReminderRequest) -> ParseReminderResponse
             success=True,
             data=parsed_data,
         )
+    except AppException:
+        raise
     except RuntimeError as re:
         raise AppException(
             title="AI Service Unavailable",

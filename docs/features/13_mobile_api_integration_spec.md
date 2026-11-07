@@ -63,3 +63,4 @@ The client maps backend RFC 7807 responses to `ApiException`:
   - `apps/mobile/test/integration/live_api_integration_test.dart`: End-to-end user lifecycle and sync against live Docker container on `127.0.0.1:8000`.
 - **Backend Tests**:
   - `apps/server/tests/`: 19 tests verifying auth, rate limiting, and atomic upsert.
+

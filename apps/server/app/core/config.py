@@ -29,6 +29,22 @@ class Settings(BaseSettings):
     )
 
     # AI Configuration
+    AI_PROVIDER: str = Field(
+        default="deepseek",
+        description="Active AI Provider: 'deepseek' or 'gemini'",
+    )
+    DEEPSEEK_API_KEY: str = Field(
+        default="",
+        description="DeepSeek API key for natural language processing",
+    )
+    DEEPSEEK_BASE_URL: str = Field(
+        default="https://api.deepseek.com",
+        description="DeepSeek API Base URL",
+    )
+    DEEPSEEK_MODEL: str = Field(
+        default="deepseek-chat",
+        description="DeepSeek model name (e.g. deepseek-chat)",
+    )
     GEMINI_API_KEY: str = Field(
         default="",
         description="Google Gemini API key for natural language processing",
