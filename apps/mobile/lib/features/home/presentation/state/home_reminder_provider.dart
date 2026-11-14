@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:pingo_mobile/core/crypto/crypto_helper.dart';
 import 'package:pingo_mobile/core/network/providers.dart';
 import 'package:pingo_mobile/core/services/notification_service.dart';

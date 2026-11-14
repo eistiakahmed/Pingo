@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pingo_mobile/core/services/notification_service.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
 import 'package:pingo_mobile/features/session_chat/presentation/screens/pingo_flow_screen.dart';
 import 'package:pingo_mobile/features/vault/presentation/screens/pingo_vault_screen.dart';
@@ -27,6 +28,10 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1600),
     )..repeat(reverse: true);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService.instance.requestPermissions();
+    });
   }
 
   @override

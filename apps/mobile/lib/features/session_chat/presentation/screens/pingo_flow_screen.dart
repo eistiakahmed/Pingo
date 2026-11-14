@@ -86,6 +86,8 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         timezone: 'Asia/Dhaka',
       );
 
+      final bool hasHeuristicTime = _hasTimeHeuristic(prompt);
+
       if (parsed.dueAt != null) {
         _hasSavedInitial = true;
         final localDue = parsed.dueAt!.toLocal();
@@ -115,8 +117,37 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           });
         }
         return;
+      } else if (hasHeuristicTime) {
+        // AI returned due_at as null, but user explicitly mentioned a date/time (e.g. 9 AM, 12 AM, kalke)!
+        // Save automatically using our reliable local scheduler without confusing the user!
+        _hasSavedInitial = true;
+        final localDue = _calculateDueAt(_taskDate, _taskTime);
+        final newId = const Uuid().v4();
+        final finalTitle = parsed.title.isNotEmpty ? parsed.title : prompt;
+
+        final item = ReminderItem(
+          id: newId,
+          title: finalTitle,
+          dueAt: localDue,
+          category: _mapAiCategory(parsed.category),
+          priority: ReminderPriority.normal,
+        );
+
+        ref.read(homeReminderProvider.notifier).addReminder(item);
+        _lastCreatedReminderId = newId;
+
+        if (mounted) {
+          setState(() {
+            _activeScenario = FlowScenario.autoSaved;
+            _taskTitle = finalTitle;
+            _taskDate = _formatAiDate(localDue);
+            _taskTime = DateFormat.jm().format(localDue);
+            _isLoadingAi = false;
+          });
+        }
+        return;
       } else {
-        // AI found no time mentioned
+        // Genuine case: No time mentioned anywhere (e.g. "Buy groceries")
         if (mounted) {
           setState(() {
             _activeScenario = FlowScenario.askQuestion;
@@ -130,11 +161,35 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
       debugPrint('[PingoFlowScreen] AI parsing error, falling back to local: $e');
     }
 
-    // Local fallback if AI fails or returns no time
+    // Local fallback if AI fails or network unavailable
     _persistLocalAutoSavedReminder();
     if (mounted) {
       setState(() => _isLoadingAi = false);
     }
+  }
+
+  bool _hasTimeHeuristic(String text) {
+    final lower = text.toLowerCase();
+    final hasNumber = RegExp(r'[0-9০-৯]').hasMatch(lower);
+    final hasDate = lower.contains('tomorrow') ||
+        lower.contains('today') ||
+        lower.contains('tonight') ||
+        lower.contains('কাল') ||
+        lower.contains('আগামীকাল') ||
+        lower.contains('পরশু') ||
+        lower.contains('kalke');
+    final hasTime = lower.contains('am') ||
+        lower.contains('pm') ||
+        lower.contains('সকাল') ||
+        lower.contains('রাত') ||
+        lower.contains('সন্ধ্যা') ||
+        lower.contains('বিকাল') ||
+        lower.contains('টা') ||
+        lower.contains('tar') ||
+        lower.contains('hour') ||
+        lower.contains('somoy') ||
+        lower.contains('সময়');
+    return (hasNumber && (hasTime || hasDate)) || (hasDate && hasTime);
   }
 
   void _persistLocalAutoSavedReminder() {
@@ -233,7 +288,15 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
       }
     }
 
-    return DateTime(baseDate.year, baseDate.month, baseDate.day, hour, minute);
+    final target =
+        DateTime(baseDate.year, baseDate.month, baseDate.day, hour, minute);
+    // If set for 'Today' but that time has already passed today (e.g., 12 AM midnight, or 9 AM in afternoon),
+    // roll over to the upcoming occurrence (tonight / tomorrow)!
+    if (dateStr == 'Today' &&
+        target.isBefore(now.subtract(const Duration(minutes: 1)))) {
+      return target.add(const Duration(days: 1));
+    }
+    return target;
   }
 
   void _parseInitialPrompt() {
@@ -335,21 +398,40 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         lower.contains('delete') ||
         lower.contains('remove') ||
         lower.contains('বাতিল');
-    if (isCancel && _lastCreatedReminderId != null) {
-      ref
-          .read(homeReminderProvider.notifier)
-          .deleteReminder(_lastCreatedReminderId!);
-      _lastCreatedReminderId = null;
-      setState(() {
-        _conversationHistory.add({
-          'isUser': true,
-          'text': trimmed,
+    if (isCancel) {
+      String? toDeleteId = _lastCreatedReminderId;
+      if (toDeleteId == null) {
+        final currentReminders = ref.read(homeReminderProvider).reminders;
+        if (currentReminders.isNotEmpty) {
+          toDeleteId = currentReminders.first.id;
+        }
+      }
+
+      if (toDeleteId != null) {
+        ref.read(homeReminderProvider.notifier).deleteReminder(toDeleteId);
+        _lastCreatedReminderId = null;
+        setState(() {
+          _conversationHistory.add({
+            'isUser': true,
+            'text': trimmed,
+          });
+          _conversationHistory.add({
+            'isUser': false,
+            'text': 'Cancelled this reminder for you.',
+          });
         });
-        _conversationHistory.add({
-          'isUser': false,
-          'text': 'Cancelled this reminder for you.',
+      } else {
+        setState(() {
+          _conversationHistory.add({
+            'isUser': true,
+            'text': trimmed,
+          });
+          _conversationHistory.add({
+            'isUser': false,
+            'text': 'There are no active reminders to cancel.',
+          });
         });
-      });
+      }
       _scrollToBottom();
       return;
     }
@@ -404,30 +486,77 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
       return;
     }
 
-    // 3. Time update for existing reminder
-    final isTimeUpdate = lower.contains('hour') ||
-        lower.contains('make it') ||
-        lower.contains('pm') ||
-        lower.contains('am') ||
-        lower.contains('move to');
-    if (isTimeUpdate) {
+    // 3. User answering "What time should I remind you?" when in askQuestion mode
+    if (_activeScenario == FlowScenario.askQuestion) {
+      final dueAt = _calculateDueAt('Today', trimmed);
+      final newId = const Uuid().v4();
+      final item = ReminderItem(
+        id: newId,
+        title: _taskTitle,
+        dueAt: dueAt,
+        category: _inferCategory(_taskTitle),
+      );
+      ref.read(homeReminderProvider.notifier).addReminder(item);
+      _lastCreatedReminderId = newId;
+
       setState(() {
-        _hasFollowUpUpdate = true;
-        _followUpTime = trimmed;
+        _activeScenario = FlowScenario.autoSaved;
+        _taskTime = DateFormat.jm().format(dueAt);
         _conversationHistory.add({
           'isUser': true,
           'text': trimmed,
         });
         _conversationHistory.add({
           'isUser': false,
-          'text': 'Got it! I updated the reminder time to $trimmed.',
+          'text':
+              'Saved: "$_taskTitle" at ${DateFormat.jm().format(dueAt)} (${_formatAiDate(dueAt)}).',
         });
       });
       _scrollToBottom();
       return;
     }
 
-    // 4. Natural language reminder using AI!
+    // 4. Time or date modification requests (e.g. "move to 5 pm", "modify date")
+    final isTimeOrDateUpdate = lower.contains('hour') ||
+        lower.contains('make it') ||
+        lower.contains('pm') ||
+        lower.contains('am') ||
+        lower.contains('move to') ||
+        lower.contains('modify') ||
+        lower.contains('change') ||
+        lower.contains('update');
+    if (isTimeOrDateUpdate) {
+      final hasTime = RegExp(r'(\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)|\b\d{1,2}(:\d{2})?\b(?=\s*(টা|tar|টার)))', caseSensitive: false).hasMatch(lower);
+      if (hasTime || lower.contains('tomorrow') || lower.contains('কাল') || lower.contains('today')) {
+        setState(() {
+          _hasFollowUpUpdate = true;
+          _followUpTime = trimmed;
+          _conversationHistory.add({
+            'isUser': true,
+            'text': trimmed,
+          });
+          _conversationHistory.add({
+            'isUser': false,
+            'text': 'Got it! I updated the reminder time to $trimmed.',
+          });
+        });
+      } else {
+        setState(() {
+          _conversationHistory.add({
+            'isUser': true,
+            'text': trimmed,
+          });
+          _conversationHistory.add({
+            'isUser': false,
+            'text': 'What new time or date should I set for this reminder?',
+          });
+        });
+      }
+      _scrollToBottom();
+      return;
+    }
+
+    // 5. Natural language reminder using AI!
     setState(() {
       _conversationHistory.add({
         'isUser': true,
@@ -474,6 +603,30 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
             });
           });
         }
+      } else if (_hasTimeHeuristic(trimmed)) {
+        // Fallback with local time calculation
+        final localDue = _calculateDueAt('Today', trimmed);
+        final newId = const Uuid().v4();
+        final item = ReminderItem(
+          id: newId,
+          title: finalTitle,
+          dueAt: localDue,
+          category: _mapAiCategory(parsed.category),
+          priority: ReminderPriority.normal,
+        );
+        ref.read(homeReminderProvider.notifier).addReminder(item);
+        _lastCreatedReminderId = newId;
+
+        if (mounted) {
+          setState(() {
+            _conversationHistory.removeLast();
+            _conversationHistory.add({
+              'isUser': false,
+              'text':
+                  'Saved: "$finalTitle" at ${DateFormat.jm().format(localDue)} (${_formatAiDate(localDue)}).',
+            });
+          });
+        }
       } else {
         if (mounted) {
           setState(() {
@@ -486,22 +639,12 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         }
       }
     } catch (e) {
-      final now = DateTime.now();
-      final newId = const Uuid().v4();
-      final item = ReminderItem(
-        id: newId,
-        title: trimmed,
-        dueAt: now.add(const Duration(hours: 1)),
-      );
-      ref.read(homeReminderProvider.notifier).addReminder(item);
-      _lastCreatedReminderId = newId;
-
       if (mounted) {
         setState(() {
           _conversationHistory.removeLast();
           _conversationHistory.add({
             'isUser': false,
-            'text': 'Saved reminder: "$trimmed".',
+            'text': 'Could not parse reminder. Please specify a time or date.',
           });
         });
       }
@@ -513,13 +656,15 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   void _saveQuestionTime(String time) {
     setState(() => _selectedTime = time);
     final dueAt = _calculateDueAt('Today', time);
+    final newId = const Uuid().v4();
     final item = ReminderItem(
-      id: const Uuid().v4(),
+      id: newId,
       title: _taskTitle,
       dueAt: dueAt,
       category: _inferCategory(_taskTitle),
     );
     ref.read(homeReminderProvider.notifier).addReminder(item);
+    _lastCreatedReminderId = newId;
     _scrollToBottom();
   }
 
@@ -1056,7 +1201,9 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _userBubble(_taskTitle),
+        _userBubble(widget.initialPrompt.isNotEmpty
+            ? widget.initialPrompt
+            : _taskTitle),
         const SizedBox(height: 14),
 
         _botHeader(),
