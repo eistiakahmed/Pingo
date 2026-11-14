@@ -445,7 +445,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           _conversationHistory.add({
             'isUser': false,
             'text':
-                '🔔 Instant test alert sent!\n\nAll notification and exact alarm permissions are active. Your punctual reminders will fire on time.',
+                '🔔 Instant test alert sent!\n\nAll notification and exact alarm permissions are active.\n\n📱 Xiaomi (HyperOS / MIUI) Notice:\nTo ensure alarms ring when screen is off or app is closed:\n1. Open Settings > Apps > Manage Apps > Pingo\n2. Turn ON "Autostart"\n3. Change Battery Saver to "No restrictions"',
           });
         } else if (!isPermitted) {
           _conversationHistory.add({

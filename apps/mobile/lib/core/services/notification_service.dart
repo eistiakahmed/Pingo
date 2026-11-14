@@ -150,6 +150,19 @@ class NotificationService {
     // Ensure 32-bit positive integer for Android PendingIntent
     final safeId = id.abs() % 2147483647;
 
+    final displayBody = (body.isNotEmpty && body != 'Scheduled alert from Pingo')
+        ? '$title\n$body'
+        : title;
+
+    final styleInfo = BigTextStyleInformation(
+      displayBody,
+      htmlFormatBigText: true,
+      contentTitle: '<b>Pingo 🐧</b>',
+      htmlFormatContentTitle: true,
+      summaryText: 'Reminder',
+      htmlFormatSummaryText: true,
+    );
+
     final androidDetails = AndroidNotificationDetails(
       isUrgent ? _urgentChannelId : _defaultChannelId,
       isUrgent ? _urgentChannelName : _defaultChannelName,
@@ -160,9 +173,9 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.alarm,
+      category: AndroidNotificationCategory.message,
       ticker: title,
-      audioAttributesUsage: AudioAttributesUsage.alarm,
+      styleInformation: styleInfo,
     );
 
     const darwinDetails = DarwinNotificationDetails(
@@ -205,6 +218,28 @@ class NotificationService {
         }
       }
 
+      // Priority 1: Schedule as a native system AlarmClock (highest Android OS priority, exempt from Doze & Xiaomi killers)
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          safeId,
+          title,
+          body,
+          targetTz,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.alarmClock,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: 'reminder_$safeId',
+        );
+        debugPrint(
+            '[NotificationService] Successfully scheduled reminder #$safeId as native AlarmClock for $targetTz');
+        return;
+      } catch (alarmClockErr) {
+        debugPrint(
+            '[NotificationService] AlarmClock schedule error ($alarmClockErr). Falling back to exactAllowWhileIdle...');
+      }
+
+      // Priority 2: Schedule with exactAllowWhileIdle or inexactAllowWhileIdle
       final scheduleMode = canExact
           ? AndroidScheduleMode.exactAllowWhileIdle
           : AndroidScheduleMode.inexactAllowWhileIdle;
@@ -275,12 +310,20 @@ class NotificationService {
     return true;
   }
 
-  /// Shows an instant test notification.
+  /// Shows an instant test notification styled like a message from Pingo.
   Future<bool> showInstantTestNotification({
-    String title = 'Pingo Test Alert 🔔',
-    String body = 'Notifications and alarms are active and working on your phone!',
+    String title = 'Pingo 🐧',
+    String body = 'Hey! This is a test reminder message from Pingo.',
   }) async {
     if (!_isInitialized) await initialize();
+    const styleInfo = BigTextStyleInformation(
+      'Hey! This is a test reminder from Pingo 🐧. Notifications and heads-up banners are working properly!',
+      htmlFormatBigText: true,
+      contentTitle: '<b>Pingo 🐧</b>',
+      htmlFormatContentTitle: true,
+      summaryText: 'Message',
+      htmlFormatSummaryText: true,
+    );
     const androidDetails = AndroidNotificationDetails(
       _defaultChannelId,
       _defaultChannelName,
@@ -290,10 +333,11 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.reminder,
+      category: AndroidNotificationCategory.message,
+      styleInformation: styleInfo,
     );
     const details = NotificationDetails(android: androidDetails);
-    await _notificationsPlugin.show(999999, title, body, details);
+    await _notificationsPlugin.show(999999, 'Pingo 🐧', body, details);
     return true;
   }
 
