@@ -783,7 +783,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor:
-                            AlwaysStoppedAnimation<Color>(AppColors.pingoPurple),
+                            AlwaysStoppedAnimation<Color>(AppColors.penguinBeak),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -792,7 +792,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.pingoPurple,
+                        color: AppColors.penguinBeak,
                       ),
                     ),
                   ],
@@ -844,7 +844,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppColors.pingoPurple),
+                                      AppColors.penguinBeak),
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -912,7 +912,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                   child: CircularProgressIndicator(
                     strokeWidth: 2.2,
                     valueColor:
-                        AlwaysStoppedAnimation<Color>(AppColors.pingoPurple),
+                        AlwaysStoppedAnimation<Color>(AppColors.penguinBeak),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -1094,7 +1094,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                   child: const Text(
                     'Undo this change',
                     style: TextStyle(
-                      color: AppColors.pingoPurple,
+                      color: AppColors.penguinBeak,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -1112,16 +1112,19 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _chip('Repeat weekly', () {
+            _chip('🔄 Repeat weekly', cardBg, borderColor, textColor, () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Set to repeat weekly')),
               );
             }),
-            _chip('Move to tomorrow', () {
+            _chip('☀️ Move to tomorrow', cardBg, borderColor, textColor, () {
               setState(() => _taskDate = 'Tomorrow');
               _handleSend('Move to tomorrow');
             }),
-            _chip('Cancel reminder', () {
+            _chip('🔔 Test alert now', cardBg, borderColor, textColor, () {
+              _handleSend('test alert');
+            }),
+            _chip('❌ Cancel reminder', cardBg, borderColor, textColor, () {
               _handleSend('Cancel this reminder');
             }),
           ],
@@ -1237,14 +1240,17 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           runSpacing: 8,
           children: [
             if (!isTomorrow)
-              _chip('What about tomorrow?', () {
+              _chip('☀️ What about tomorrow?', cardBg, borderColor, textColor, () {
                 _handleSend('What do I have tomorrow?');
               }),
             if (isTomorrow)
-              _chip('What about today?', () {
+              _chip('📋 What about today?', cardBg, borderColor, textColor, () {
                 _handleSend('What do I have today?');
               }),
-            _chip('Show all tasks', () {
+            _chip('🔔 Test alert sound', cardBg, borderColor, textColor, () {
+              _handleSend('test alert');
+            }),
+            _chip('📑 Show all tasks', cardBg, borderColor, textColor, () {
               _handleSend('Show all tasks');
             }),
           ],
@@ -1323,7 +1329,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                 child: const Text(
                   'Pick another time',
                   style: TextStyle(
-                    color: AppColors.pingoPurple,
+                    color: AppColors.penguinBeak,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -1373,17 +1379,31 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
       alignment: Alignment.centerRight,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 320),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.pingoPurple,
-          borderRadius: BorderRadius.circular(24),
+          gradient: const LinearGradient(
+            colors: [
+              AppColors.penguinBeak,
+              AppColors.penguinOrange,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.penguinBeak.withValues(alpha: 0.30),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Text(
           text,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 15.5,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -1391,27 +1411,34 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   }
 
   Widget _botHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         Container(
-          width: 28,
-          height: 28,
+          width: 30,
+          height: 30,
           decoration: BoxDecoration(
-            color: AppColors.pingoPurpleLight,
+            color: AppColors.penguinBeak.withValues(alpha: 0.16),
             shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.penguinBeak.withValues(alpha: 0.35),
+              width: 1.2,
+            ),
           ),
           child: const Center(
-            child: Icon(Icons.notifications_rounded,
-                color: AppColors.pingoPurple, size: 16),
+            child: Text(
+              '🐧',
+              style: TextStyle(fontSize: 15),
+            ),
           ),
         ),
         const SizedBox(width: 8),
-        const Text(
+        Text(
           'Pingo',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 14.5,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF1E1B4B),
+            color: isDark ? AppColors.penguinSnow : AppColors.pingoDark,
           ),
         ),
       ],
@@ -1429,20 +1456,34 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   }) {
     return InkWell(
       onTap: onToggle,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: isCompleted
+              ? Colors.transparent
+              : AppColors.penguinBeak.withValues(alpha: 0.04),
+          border: Border.all(
+            color: isCompleted ? borderColor.withValues(alpha: 0.5) : borderColor,
+            width: 1,
+          ),
+        ),
         child: Row(
           children: [
             isCompleted
-                ? const Icon(Icons.check_circle,
+                ? const Icon(Icons.check_circle_rounded,
                     color: AppColors.success, size: 22)
                 : Container(
-                    width: 20,
-                    height: 20,
+                    width: 22,
+                    height: 22,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: const Color(0xFF9CA3AF), width: 1.6),
+                        color: AppColors.penguinBeak,
+                        width: 2,
+                      ),
                     ),
                   ),
             const SizedBox(width: 12),
@@ -1457,12 +1498,19 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                 ),
               ),
             ),
-            Text(
-              time,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-                color: mutedColor,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: AppColors.penguinGlacier.withValues(alpha: 0.12),
+              ),
+              child: Text(
+                time,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.penguinGlacier,
+                ),
               ),
             ),
           ],
@@ -1484,24 +1532,26 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected ? AppColors.pingoPurple : borderColor,
-            width: isSelected ? 1.8 : 1.2,
+            color: isSelected ? AppColors.penguinBeak : borderColor,
+            width: isSelected ? 2 : 1.2,
           ),
-          color: isSelected ? AppColors.pingoPurpleSubtle : Colors.transparent,
+          color: isSelected
+              ? AppColors.penguinBeak.withValues(alpha: 0.12)
+              : Colors.transparent,
         ),
         child: Text(
           timeText,
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: isSelected ? AppColors.pingoPurple : textColor,
+            color: isSelected ? AppColors.penguinBeak : textColor,
           ),
         ),
       ),
     );
   }
 
-  Widget _chip(String label, VoidCallback onTap) {
+  Widget _chip(String label, Color bg, Color border, Color textColor, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -1509,15 +1559,15 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
-          color: Colors.white,
+          border: Border.all(color: border, width: 1.2),
+          color: bg,
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13.5,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF374151),
+            fontWeight: FontWeight.w600,
+            color: textColor,
           ),
         ),
       ),
@@ -1571,10 +1621,17 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
               height: 44,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.pingoPurple,
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.penguinBeak,
+                    AppColors.penguinOrange,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
               child: const Center(
-                child: Icon(Icons.mic, color: Colors.white, size: 22),
+                child: Icon(Icons.mic_rounded, color: Colors.white, size: 22),
               ),
             ),
           ),

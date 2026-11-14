@@ -331,10 +331,20 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
                             height: 140,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: _isListening ? AppColors.pingoPurple : const Color(0xFF6B7280),
+                              gradient: _isListening
+                                  ? const LinearGradient(
+                                      colors: [
+                                        AppColors.penguinBeak,
+                                        AppColors.penguinOrange,
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : null,
+                              color: _isListening ? null : const Color(0xFF6B7280),
                               boxShadow: [
                                 BoxShadow(
-                                  color: (_isListening ? AppColors.pingoPurple : const Color(0xFF6B7280)).withValues(alpha: 0.35),
+                                  color: (_isListening ? AppColors.penguinBeak : const Color(0xFF6B7280)).withValues(alpha: 0.35),
                                   blurRadius: 28,
                                   offset: const Offset(0, 10),
                                 ),

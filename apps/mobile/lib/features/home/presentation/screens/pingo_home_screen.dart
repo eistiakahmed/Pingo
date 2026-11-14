@@ -104,19 +104,26 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.notifications_none_rounded,
-                            color: AppColors.pingoPurple,
-                            size: 26,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.penguinBeak.withValues(alpha: 0.15),
+                            ),
+                            child: const Icon(
+                              Icons.notifications_active_rounded,
+                              color: AppColors.penguinBeak,
+                              size: 20,
+                            ),
                           ),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text(
-                            'Pingo',
+                            'Pingo 🐧',
                             style: TextStyle(
                               fontSize: 23,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.pingoPurple,
+                              color: textColor,
                               letterSpacing: -0.4,
                             ),
                           ),
@@ -130,21 +137,21 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                     onTap: () => PingoVaultScreen.open(context),
                     borderRadius: BorderRadius.circular(24),
                     child: Container(
-                      width: 48,
-                      height: 48,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isDark ? AppColors.darkBorder : const Color(0xFFE5E7EB),
+                          color: borderColor,
                           width: 1.2,
                         ),
-                        color: isDark ? AppColors.darkSurface : Colors.white,
+                        color: cardBg,
                       ),
-                      child: const Center(
+                      child: Center(
                         child: Icon(
                           Icons.folder_outlined,
-                          size: 22,
-                          color: Color(0xFF374151),
+                          size: 20,
+                          color: textColor,
                         ),
                       ),
                     ),
@@ -203,7 +210,7 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                                 height: outerR * 2,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: AppColors.pingoPurple.withValues(alpha: 0.05),
+                                  color: AppColors.penguinBeak.withValues(alpha: 0.08),
                                 ),
                               ),
                               // Mid Ring
@@ -212,10 +219,10 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                                 height: midR * 2,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: AppColors.pingoPurple.withValues(alpha: 0.10),
+                                  color: AppColors.penguinBeak.withValues(alpha: 0.16),
                                 ),
                               ),
-                              // Solid Mic Button
+                              // Solid Penguin Beak Gradient Button
                               GestureDetector(
                                 onTap: () {
                                   PingoVoiceScreen.show(context, onSpeechFinished: (speech) {
@@ -227,20 +234,28 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                                   height: 130,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: AppColors.pingoPurple,
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        AppColors.penguinBeak,
+                                        AppColors.penguinOrange,
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.pingoPurple.withValues(alpha: 0.38),
-                                        blurRadius: 28,
+                                        color: AppColors.penguinBeak.withValues(alpha: 0.45),
+                                        blurRadius: 32,
+                                        spreadRadius: 2,
                                         offset: const Offset(0, 10),
                                       ),
                                     ],
                                   ),
                                   child: const Center(
                                     child: Icon(
-                                      Icons.mic,
+                                      Icons.mic_rounded,
                                       color: Colors.white,
-                                      size: 54,
+                                      size: 56,
                                     ),
                                   ),
                                 ),
@@ -252,7 +267,7 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      'Tap and say it',
+                      'Tap and speak to Pingo 🐧',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -265,36 +280,39 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
 
               const Spacer(flex: 3),
 
-              // Quick Suggestion Chips
+              // Quick Suggestion Chips (Adaptive Dark/Light)
               Center(
-                child: Column(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _chip('What do I have today?', () {
-                          PingoFlowScreen.open(
-                            context,
-                            scenario: FlowScenario.askAboutToday,
-                            prompt: 'What do I have today?',
-                          );
-                        }),
-                        const SizedBox(width: 8),
-                        _chip('Pay bill on the 10th', () {
-                          PingoFlowScreen.open(
-                            context,
-                            scenario: FlowScenario.autoSaved,
-                            prompt: 'Pay bill on the 10th',
-                          );
-                        }),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _chip('Medicine every day 9 pm', () {
+                    _chip('☀️ What do I have today?', cardBg, borderColor, textColor, () {
+                      PingoFlowScreen.open(
+                        context,
+                        scenario: FlowScenario.askAboutToday,
+                        prompt: 'What do I have today?',
+                      );
+                    }),
+                    _chip('🔔 Test alert', cardBg, borderColor, textColor, () {
+                      PingoFlowScreen.open(
+                        context,
+                        scenario: FlowScenario.autoSaved,
+                        prompt: 'test alert',
+                      );
+                    }),
+                    _chip('💊 Medicine every day 9 pm', cardBg, borderColor, textColor, () {
                       PingoFlowScreen.open(
                         context,
                         scenario: FlowScenario.autoSaved,
                         prompt: 'Medicine every day 9 pm',
+                      );
+                    }),
+                    _chip('⚡ Pay bill on the 10th', cardBg, borderColor, textColor, () {
+                      PingoFlowScreen.open(
+                        context,
+                        scenario: FlowScenario.autoSaved,
+                        prompt: 'Pay bill on the 10th',
                       );
                     }),
                   ],
@@ -350,7 +368,7 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                       ),
                     ),
 
-                    // Solid Purple Up-Arrow Button
+                    // Solid Penguin Beak Up-Arrow Button
                     GestureDetector(
                       onTap: () => _submitText(_inputController.text),
                       child: Container(
@@ -358,7 +376,14 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                         height: 44,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.pingoPurple,
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.penguinBeak,
+                              AppColors.penguinOrange,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                         ),
                         child: const Center(
                           child: Icon(
@@ -381,23 +406,23 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
     );
   }
 
-  Widget _chip(String label, VoidCallback onTap) {
+  Widget _chip(String label, Color bg, Color border, Color textColor, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
-          color: Colors.white,
+          border: Border.all(color: border, width: 1.2),
+          color: bg,
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13.5,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF374151),
+            fontWeight: FontWeight.w600,
+            color: textColor,
           ),
         ),
       ),
