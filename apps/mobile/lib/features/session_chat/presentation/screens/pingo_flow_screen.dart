@@ -44,6 +44,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   final ScrollController _scrollController = ScrollController();
 
   // Dynamic state for auto-saved reminder
+  late FlowScenario _activeScenario;
   late String _taskTitle;
   late String _taskDate;
   late String _taskTime;
@@ -63,6 +64,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   @override
   void initState() {
     super.initState();
+    _activeScenario = widget.scenario;
     _parseInitialPrompt();
 
     // Trigger AI parsing for reminder creation
@@ -105,9 +107,20 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
 
         if (mounted) {
           setState(() {
+            _activeScenario = FlowScenario.autoSaved;
             _taskTitle = finalTitle;
             _taskDate = _formatAiDate(localDue);
             _taskTime = DateFormat.jm().format(localDue);
+            _isLoadingAi = false;
+          });
+        }
+        return;
+      } else {
+        // AI found no time mentioned
+        if (mounted) {
+          setState(() {
+            _activeScenario = FlowScenario.askQuestion;
+            _taskTitle = parsed.title.isNotEmpty ? parsed.title : prompt;
             _isLoadingAi = false;
           });
         }
@@ -521,9 +534,9 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted;
 
     String hintText = 'Reply to Pingo...';
-    if (widget.scenario == FlowScenario.askAboutToday) {
+    if (_activeScenario == FlowScenario.askAboutToday) {
       hintText = 'Ask about tomorrow, next week, or add...';
-    } else if (widget.scenario == FlowScenario.askQuestion) {
+    } else if (_activeScenario == FlowScenario.askQuestion) {
       hintText = 'Or say the time';
     }
 
@@ -586,14 +599,14 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 children: [
-                  if (widget.scenario == FlowScenario.autoSaved) ...[
+                  if (_activeScenario == FlowScenario.autoSaved) ...[
                     _buildAutoSavedContent(
                         isDark, cardBg, borderColor, textColor, mutedColor),
-                  ] else if (widget.scenario ==
+                  ] else if (_activeScenario ==
                       FlowScenario.askAboutToday) ...[
                     _buildAskAboutTodayContent(
                         isDark, cardBg, borderColor, textColor, mutedColor),
-                  ] else if (widget.scenario == FlowScenario.askQuestion) ...[
+                  ] else if (_activeScenario == FlowScenario.askQuestion) ...[
                     _buildAskQuestionContent(
                         isDark, cardBg, borderColor, textColor, mutedColor),
                   ],
@@ -668,6 +681,48 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
     Color textColor,
     Color mutedColor,
   ) {
+    if (_isLoadingAi) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _userBubble(widget.initialPrompt),
+          const SizedBox(height: 14),
+          _botHeader(),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: borderColor, width: 1.2),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(AppColors.pingoPurple),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  'Scheduling with AI...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

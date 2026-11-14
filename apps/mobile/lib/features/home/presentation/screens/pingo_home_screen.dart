@@ -54,17 +54,10 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
         (lower.contains('what') && lower.contains('tomorrow')) ||
         (lower.contains('what') && lower.contains('today'));
 
-    final hasTimeOrDate = RegExp(
-      r'(\b\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)\b|\b(tomorrow|today|tonight|alarm|reminder|meeting|doctor|medicine|bill)\b|[০-৯\d]+(\s*:\s*[০-৯\d]+)?\s*টা|কাল|আগামীকাল|পরশু|আজ|সকাল|বিকাল|সন্ধ্যা|রাত|ঔষধ|বিল|মিটিং|নামাজ)',
-      caseSensitive: false,
-    ).hasMatch(trimmed);
-
     if (isQueryTasks) {
       PingoFlowScreen.open(context, scenario: FlowScenario.askAboutToday, prompt: trimmed);
-    } else if (hasTimeOrDate) {
-      PingoFlowScreen.open(context, scenario: FlowScenario.autoSaved, prompt: trimmed);
     } else {
-      PingoFlowScreen.open(context, scenario: FlowScenario.askQuestion, prompt: trimmed);
+      PingoFlowScreen.open(context, scenario: FlowScenario.autoSaved, prompt: trimmed);
     }
   }
 
