@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:pingo_mobile/core/network/providers.dart';
+import 'package:pingo_mobile/core/services/notification_service.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
 import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
 import 'package:pingo_mobile/features/home/presentation/state/home_reminder_provider.dart';
@@ -77,6 +78,33 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
 
   Future<void> _processPromptWithAi(String prompt) async {
     if (_hasSavedInitial) return;
+
+    final lowerPrompt = prompt.toLowerCase();
+    if (lowerPrompt.contains('test') ||
+        lowerPrompt.contains('চেক') ||
+        lowerPrompt.contains('check alert')) {
+      await NotificationService.instance.showInstantTestNotification();
+      final isPermitted =
+          await NotificationService.instance.areNotificationsEnabled();
+      if (mounted) {
+        setState(() {
+          _activeScenario = FlowScenario.autoSaved;
+          _taskTitle = 'Instant Test Alert 🔔';
+          _taskDate = 'Today';
+          _taskTime = DateFormat.jm().format(DateTime.now());
+          _isLoadingAi = false;
+          _hasSavedInitial = true;
+          _conversationHistory.add({
+            'isUser': false,
+            'text': isPermitted
+                ? '🔔 Triggered an instant test notification on your screen right now!\n\nIf you see the notification banner and hear the sound, notifications are working 100%.'
+                : '⚠️ Notifications are currently BLOCKED in your phone settings.\n\nPlease open your phone\'s Settings > Apps > Pingo > Notifications and turn on:\n• Allow notifications\n• Floating notifications\n• Lock screen notifications',
+          });
+        });
+      }
+      return;
+    }
+
     setState(() => _isLoadingAi = true);
 
     try {
@@ -392,6 +420,41 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
     _inputController.clear();
 
     final lower = trimmed.toLowerCase();
+
+    // 0. Instant Alert Test Command (e.g. "test alert", "নোটিফিকেশন এলার্ট চেক", "check notification")
+    final isTestAlert = lower.contains('test') ||
+        lower.contains('চেক') ||
+        lower.contains('check alert') ||
+        lower.contains('check notification');
+    if (isTestAlert) {
+      await NotificationService.instance.showInstantTestNotification(
+        title: 'Pingo Test Alert 🔔',
+        body: 'Alarms & notifications are active and punctually working!',
+      );
+      final isPermitted =
+          await NotificationService.instance.areNotificationsEnabled();
+      setState(() {
+        _conversationHistory.add({
+          'isUser': true,
+          'text': trimmed,
+        });
+        if (isPermitted) {
+          _conversationHistory.add({
+            'isUser': false,
+            'text':
+                '🔔 I just triggered an instant test alert on your screen!\n\nIf you see the notification banner and hear the sound, notifications are working perfectly.',
+          });
+        } else {
+          _conversationHistory.add({
+            'isUser': false,
+            'text':
+                '⚠️ Notifications are currently BLOCKED in your phone settings.\n\nPlease open your phone\'s Settings > Apps > Pingo > Notifications and turn on:\n• Allow notifications\n• Floating notifications (banners)\n• Lock screen notifications',
+          });
+        }
+      });
+      _scrollToBottom();
+      return;
+    }
 
     // 1. Cancellation command
     final isCancel = lower.contains('cancel') ||

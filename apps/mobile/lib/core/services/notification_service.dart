@@ -158,9 +158,8 @@ class NotificationService {
       priority: Priority.max,
       playSound: true,
       enableVibration: true,
-      fullScreenIntent: true,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.alarm,
+      category: AndroidNotificationCategory.reminder,
       ticker: title,
     );
 
@@ -177,10 +176,11 @@ class NotificationService {
       macOS: darwinDetails,
     );
 
-    // If the scheduled date is now or in the past, show the alert immediately!
-    if (scheduledDate.isBefore(DateTime.now().add(const Duration(seconds: 1)))) {
+    final now = DateTime.now();
+    // If the scheduled date is now, in the past, or within the next 15 seconds, show the alert immediately!
+    if (scheduledDate.isBefore(now.add(const Duration(seconds: 15)))) {
       debugPrint(
-          '[NotificationService] Trigger date $scheduledDate is immediate or in past, showing alert now!');
+          '[NotificationService] Trigger date $scheduledDate is immediate or within 15s. Showing alert now!');
       await _notificationsPlugin.show(
         safeId,
         title,
@@ -193,6 +193,21 @@ class NotificationService {
 
     try {
       final tzDateTime = tz.TZDateTime.from(scheduledDate, tz.local);
+      final tzNow = tz.TZDateTime.now(tz.local);
+
+      // If timezone converted date is within 5 seconds of now or in the past, show immediately!
+      if (tzDateTime.isBefore(tzNow.add(const Duration(seconds: 5)))) {
+        debugPrint(
+            '[NotificationService] tzDateTime ($tzDateTime) is too close to now. Showing alert now!');
+        await _notificationsPlugin.show(
+          safeId,
+          title,
+          body,
+          notificationDetails,
+          payload: 'reminder_$safeId',
+        );
+        return;
+      }
 
       await _notificationsPlugin.zonedSchedule(
         safeId,
@@ -225,15 +240,36 @@ class NotificationService {
         );
       } catch (fallbackError) {
         debugPrint(
-            '[NotificationService] Inexact schedule failed: $fallbackError');
+            '[NotificationService] Inexact schedule failed ($fallbackError). Showing alert now.');
+        await _notificationsPlugin.show(
+          safeId,
+          title,
+          body,
+          notificationDetails,
+          payload: 'reminder_$safeId',
+        );
       }
     }
   }
 
+  /// Checks if notifications are permitted on the device.
+  Future<bool> areNotificationsEnabled() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      final androidImplementation = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImplementation != null) {
+        final enabled = await androidImplementation.areNotificationsEnabled();
+        return enabled ?? false;
+      }
+    }
+    return true;
+  }
+
   /// Shows an instant test notification.
-  Future<void> showInstantTestNotification({
-    String title = 'Pingo Test Alert',
-    String body = 'Notifications and alarms are working punctually on your phone!',
+  Future<bool> showInstantTestNotification({
+    String title = 'Pingo Test Alert 🔔',
+    String body = 'Notifications and alarms are active and working on your phone!',
   }) async {
     if (!_isInitialized) await initialize();
     const androidDetails = AndroidNotificationDetails(
@@ -245,10 +281,11 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.alarm,
+      category: AndroidNotificationCategory.reminder,
     );
     const details = NotificationDetails(android: androidDetails);
     await _notificationsPlugin.show(999999, title, body, details);
+    return true;
   }
 
   /// Cancels a scheduled notification by its ID.
