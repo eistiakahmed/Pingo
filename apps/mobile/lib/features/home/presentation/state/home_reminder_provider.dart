@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:pingo_mobile/core/crypto/crypto_helper.dart';
+import 'package:pingo_mobile/core/services/notification_service.dart';
 import 'package:pingo_mobile/features/home/data/sync_api_service.dart';
 import 'package:pingo_mobile/features/home/domain/sync_models.dart';
 import '../../domain/reminder_item.dart';
@@ -57,6 +59,15 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     state = state.copyWith(
       reminders: [...state.reminders, item],
     );
+    if (!item.isDone) {
+      NotificationService.instance.scheduleReminder(
+        id: item.id.hashCode,
+        title: item.title,
+        body: 'Scheduled alert from Pingo',
+        scheduledDate: item.dueAt,
+        isUrgent: item.category == ReminderCategory.medicine || item.priority == ReminderPriority.important,
+      );
+    }
   }
 
   /// Update an existing reminder
@@ -64,6 +75,17 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     state = state.copyWith(
       reminders: state.reminders.map((r) => r.id == item.id ? item : r).toList(),
     );
+    if (!item.isDone) {
+      NotificationService.instance.scheduleReminder(
+        id: item.id.hashCode,
+        title: item.title,
+        body: 'Scheduled alert from Pingo',
+        scheduledDate: item.dueAt,
+        isUrgent: item.category == ReminderCategory.medicine || item.priority == ReminderPriority.important,
+      );
+    } else {
+      NotificationService.instance.cancelReminder(item.id.hashCode);
+    }
   }
 
   /// Snooze reminder by given duration
@@ -71,10 +93,17 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     state = state.copyWith(
       reminders: state.reminders.map((r) {
         if (r.id == id) {
-          return r.copyWith(
+          final updated = r.copyWith(
             dueAt: r.dueAt.add(duration),
             isOverdue: false,
           );
+          NotificationService.instance.scheduleReminder(
+            id: updated.id.hashCode,
+            title: updated.title,
+            body: 'Snoozed reminder from Pingo',
+            scheduledDate: updated.dueAt,
+          );
+          return updated;
         }
         return r;
       }).toList(),
@@ -86,7 +115,18 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     state = state.copyWith(
       reminders: state.reminders.map((r) {
         if (r.id == id) {
-          return r.copyWith(isDone: !r.isDone);
+          final newDone = !r.isDone;
+          if (newDone) {
+            NotificationService.instance.cancelReminder(r.id.hashCode);
+          } else {
+            NotificationService.instance.scheduleReminder(
+              id: r.id.hashCode,
+              title: r.title,
+              body: 'Active reminder from Pingo',
+              scheduledDate: r.dueAt,
+            );
+          }
+          return r.copyWith(isDone: newDone);
         }
         return r;
       }).toList(),
@@ -95,6 +135,7 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
 
   /// Delete a reminder
   void deleteReminder(String id) {
+    NotificationService.instance.cancelReminder(id.hashCode);
     state = state.copyWith(
       reminders: state.reminders.where((r) => r.id != id).toList(),
     );
@@ -142,7 +183,7 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
           id: dto.id,
           title: decodedTitle,
           dueAt: dto.dueAt ?? DateTime.now(),
-          category: 'GENERAL',
+          category: ReminderCategory.other,
           isDone: dto.isCompleted,
         );
       }).toList();

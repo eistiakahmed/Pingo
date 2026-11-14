@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
+import 'package:pingo_mobile/features/home/presentation/state/home_reminder_provider.dart';
 import 'package:pingo_mobile/features/voice_capture/presentation/screens/pingo_voice_screen.dart';
 
 enum FlowScenario {
@@ -8,8 +13,8 @@ enum FlowScenario {
   askQuestion,
 }
 
-/// Screen implementing conversational flows with clean, zero-mock dynamic data.
-class PingoFlowScreen extends StatefulWidget {
+/// Screen implementing conversational flows with clean, zero-mock dynamic data and persistent local state.
+class PingoFlowScreen extends ConsumerStatefulWidget {
   final FlowScenario scenario;
   final String initialPrompt;
 
@@ -19,19 +24,21 @@ class PingoFlowScreen extends StatefulWidget {
     required this.initialPrompt,
   });
 
-  static void open(BuildContext context, {required FlowScenario scenario, required String prompt}) {
+  static void open(BuildContext context,
+      {required FlowScenario scenario, required String prompt}) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PingoFlowScreen(scenario: scenario, initialPrompt: prompt),
+        builder: (_) =>
+            PingoFlowScreen(scenario: scenario, initialPrompt: prompt),
       ),
     );
   }
 
   @override
-  State<PingoFlowScreen> createState() => _PingoFlowScreenState();
+  ConsumerState<PingoFlowScreen> createState() => _PingoFlowScreenState();
 }
 
-class _PingoFlowScreenState extends State<PingoFlowScreen> {
+class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -41,10 +48,11 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
   late String _taskTime;
   bool _hasFollowUpUpdate = false;
   String _followUpTime = '6:00 PM';
-  String _reminderAlert = '1 hour before';
+  String _reminderAlert = 'At time of event';
+  bool _hasSavedInitial = false;
 
-  // State for user checklist items
-  final List<Map<String, dynamic>> _todayTasks = [];
+  // Follow-up conversation bubbles: List of Map<String, dynamic> { 'isUser': bool, 'text': String }
+  final List<Map<String, dynamic>> _conversationHistory = [];
 
   // State for Ask Question scenario
   String? _selectedTime;
@@ -53,6 +61,81 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
   void initState() {
     super.initState();
     _parseInitialPrompt();
+
+    // Auto-save reminder if opened in autoSaved scenario
+    if (widget.scenario == FlowScenario.autoSaved) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _persistAutoSavedReminder();
+      });
+    }
+  }
+
+  void _persistAutoSavedReminder() {
+    if (_hasSavedInitial) return;
+    _hasSavedInitial = true;
+
+    final dueAt = _calculateDueAt(_taskDate, _taskTime);
+    final item = ReminderItem(
+      id: const Uuid().v4(),
+      title: _taskTitle,
+      dueAt: dueAt,
+      category: _inferCategory(_taskTitle),
+    );
+    ref.read(homeReminderProvider.notifier).addReminder(item);
+  }
+
+  ReminderCategory _inferCategory(String text) {
+    final lower = text.toLowerCase();
+    if (lower.contains('medicine') ||
+        lower.contains('ঔষধ') ||
+        lower.contains('doctor') ||
+        lower.contains('ডাক্তার')) {
+      return ReminderCategory.medicine;
+    }
+    if (lower.contains('bill') ||
+        lower.contains('বিল') ||
+        lower.contains('pay') ||
+        lower.contains('টাকা')) {
+      return ReminderCategory.bill;
+    }
+    if (lower.contains('meeting') ||
+        lower.contains('মিটিং') ||
+        lower.contains('work') ||
+        lower.contains('office')) {
+      return ReminderCategory.work;
+    }
+    if (lower.contains('birthday') || lower.contains('জন্মদিন')) {
+      return ReminderCategory.birthday;
+    }
+    return ReminderCategory.other;
+  }
+
+  DateTime _calculateDueAt(String dateStr, String timeStr) {
+    final now = DateTime.now();
+    DateTime baseDate = now;
+    if (dateStr == 'Tomorrow') {
+      baseDate = now.add(const Duration(days: 1));
+    } else if (dateStr == 'Day after tomorrow') {
+      baseDate = now.add(const Duration(days: 2));
+    }
+
+    int hour = 9;
+    int minute = 0;
+    final cleanTime = timeStr.toUpperCase();
+    final match =
+        RegExp(r'(\d{1,2}):?(\d{2})?\s*(AM|PM)?').firstMatch(cleanTime);
+    if (match != null) {
+      hour = int.tryParse(match.group(1) ?? '9') ?? 9;
+      minute = int.tryParse(match.group(2) ?? '0') ?? 0;
+      final period = match.group(3);
+      if (period == 'PM' && hour < 12) {
+        hour += 12;
+      } else if (period == 'AM' && hour == 12) {
+        hour = 0;
+      }
+    }
+
+    return DateTime(baseDate.year, baseDate.month, baseDate.day, hour, minute);
   }
 
   void _parseInitialPrompt() {
@@ -63,19 +146,29 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
       _taskTitle = prompt;
     }
     _taskDate = 'Today';
-    _taskTime = 'Scheduled';
+    _taskTime = '9:00 AM';
 
     // Normalize Bangla digits to standard numerals
     final Map<String, String> bnDigits = {
-      '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5',
-      '৬': '6', '৭': '7', '৮': '8', '৯': '9', '০': '0'
+      '১': '1',
+      '২': '2',
+      '৩': '3',
+      '৪': '4',
+      '৫': '5',
+      '৬': '6',
+      '৭': '7',
+      '৮': '8',
+      '৯': '9',
+      '০': '0'
     };
     String normalized = prompt;
     bnDigits.forEach((k, v) => normalized = normalized.replaceAll(k, v));
     final lower = normalized.toLowerCase();
 
     // Dates
-    if (lower.contains('tomorrow') || lower.contains('কাল') || lower.contains('আগামীকাল')) {
+    if (lower.contains('tomorrow') ||
+        lower.contains('কাল') ||
+        lower.contains('আগামীকাল')) {
       _taskDate = 'Tomorrow';
     } else if (lower.contains('পরশু')) {
       _taskDate = 'Day after tomorrow';
@@ -84,14 +177,21 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
     }
 
     // Dynamic Time Matcher (e.g. 9:00 a.m., 9 am, 9:00, ৯টা)
-    final timeMatch = RegExp(r'(\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)|\b\d{1,2}(:\d{2})?\b(?=\s*টা))', caseSensitive: false).firstMatch(lower);
+    final timeMatch = RegExp(
+            r'(\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)|\b\d{1,2}(:\d{2})?\b(?=\s*টা))',
+            caseSensitive: false)
+        .firstMatch(lower);
     if (timeMatch != null) {
       String raw = timeMatch.group(0)!.replaceAll('.', '').toUpperCase().trim();
       if (raw.contains('PM') || raw.contains('AM')) {
         _taskTime = raw;
       } else if (lower.contains('সকাল') || lower.contains('morning')) {
         _taskTime = raw.contains(':') ? '$raw AM' : '$raw:00 AM';
-      } else if (lower.contains('রাত') || lower.contains('সন্ধ্যা') || lower.contains('বিকাল') || lower.contains('night') || lower.contains('evening')) {
+      } else if (lower.contains('রাত') ||
+          lower.contains('সন্ধ্যা') ||
+          lower.contains('বিকাল') ||
+          lower.contains('night') ||
+          lower.contains('evening')) {
         _taskTime = raw.contains(':') ? '$raw PM' : '$raw:00 PM';
       } else {
         _taskTime = raw.contains(':') ? '$raw AM' : '$raw:00 AM';
@@ -130,14 +230,104 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
     _inputController.clear();
 
     final lower = trimmed.toLowerCase();
+
+    // Check if message is querying tasks (today, tomorrow, etc.)
+    final isQueryTasks = lower.contains('what') ||
+        lower.contains('task') ||
+        lower.contains('tasks') ||
+        lower.contains('schedule') ||
+        lower.contains('show') ||
+        lower.contains('কাল') ||
+        lower.contains('টাস্ক');
+
+    // Check if message is updating the time
+    final isTimeUpdate = lower.contains('hour') ||
+        lower.contains('make it') ||
+        lower.contains('pm') ||
+        lower.contains('am') ||
+        lower.contains('move to');
+
     setState(() {
-      if (lower.contains('hour') || lower.contains('make it') || lower.contains('pm') || lower.contains('am')) {
+      _conversationHistory.add({
+        'isUser': true,
+        'text': trimmed,
+      });
+
+      if (isTimeUpdate) {
         _hasFollowUpUpdate = true;
         _followUpTime = trimmed;
-      } else if (lower.contains('morning') || lower.contains('afternoon') || lower.contains('evening')) {
-        _selectedTime = trimmed;
+        _conversationHistory.add({
+          'isUser': false,
+          'text': 'Got it! I updated the reminder time to $trimmed.',
+        });
+      } else if (isQueryTasks) {
+        final isTomorrow = lower.contains('tomorrow') ||
+            lower.contains('কাল') ||
+            lower.contains('আগামীকাল');
+        final targetDate = isTomorrow
+            ? DateTime.now().add(const Duration(days: 1))
+            : DateTime.now();
+        final label = isTomorrow ? 'tomorrow' : 'today';
+
+        final allReminders = ref.read(homeReminderProvider).reminders;
+        final matching = allReminders.where((r) {
+          return r.dueAt.year == targetDate.year &&
+              r.dueAt.month == targetDate.month &&
+              r.dueAt.day == targetDate.day;
+        }).toList();
+
+        if (matching.isEmpty) {
+          _conversationHistory.add({
+            'isUser': false,
+            'text': 'You have no tasks scheduled for $label!',
+          });
+        } else {
+          final summary = matching
+              .map((t) =>
+                  '• ${t.title} at ${DateFormat.jm().format(t.dueAt)}${t.isDone ? " (Done)" : ""}')
+              .join('\n');
+          _conversationHistory.add({
+            'isUser': false,
+            'text': 'Here are your tasks for $label:\n$summary',
+          });
+        }
+      } else {
+        // Save as a new reminder
+        final isTomorrow = lower.contains('tomorrow') ||
+            lower.contains('কাল') ||
+            lower.contains('আগামীকাল');
+        final targetDate = isTomorrow
+            ? DateTime.now().add(const Duration(days: 1))
+            : DateTime.now();
+        final newReminder = ReminderItem(
+          id: const Uuid().v4(),
+          title: trimmed,
+          dueAt: targetDate,
+          category: _inferCategory(trimmed),
+        );
+        ref.read(homeReminderProvider.notifier).addReminder(newReminder);
+
+        _conversationHistory.add({
+          'isUser': false,
+          'text':
+              'Saved: "$trimmed" scheduled for ${DateFormat('EEEE, MMMM d').format(targetDate)}.',
+        });
       }
     });
+
+    _scrollToBottom();
+  }
+
+  void _saveQuestionTime(String time) {
+    setState(() => _selectedTime = time);
+    final dueAt = _calculateDueAt('Today', time);
+    final item = ReminderItem(
+      id: const Uuid().v4(),
+      title: _taskTitle,
+      dueAt: dueAt,
+      category: _inferCategory(_taskTitle),
+    );
+    ref.read(homeReminderProvider.notifier).addReminder(item);
     _scrollToBottom();
   }
 
@@ -148,18 +338,13 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
     final cardBg = isDark ? AppColors.darkSurface : AppColors.pingoSurface;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.pingoBorder;
     final textColor = isDark ? Colors.white : AppColors.pingoDark;
-    final mutedColor = isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted;
+    final mutedColor =
+        isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted;
 
-    String title = 'Pingo';
-    String hintText = 'Change it by message or voice';
-    if (widget.scenario == FlowScenario.autoSaved) {
-      title = 'Reminder set';
-      hintText = 'Change it by message or voice';
-    } else if (widget.scenario == FlowScenario.askAboutToday) {
-      title = 'Pingo';
-      hintText = 'Ask about your tasks';
+    String hintText = 'Reply to Pingo...';
+    if (widget.scenario == FlowScenario.askAboutToday) {
+      hintText = 'Ask about tomorrow, next week, or add...';
     } else if (widget.scenario == FlowScenario.askQuestion) {
-      title = 'Pingo';
       hintText = 'Or say the time';
     }
 
@@ -168,35 +353,22 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header Bar
+            // Top Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(24),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark ? AppColors.darkBorder : const Color(0xFFE5E7EB),
-                          width: 1.2,
-                        ),
-                        color: isDark ? AppColors.darkSurface : Colors.white,
-                      ),
-                      child: Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 16,
-                        color: isDark ? Colors.white70 : const Color(0xFF374151),
-                      ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: textColor,
+                      size: 20,
                     ),
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
                   Text(
-                    title,
+                    'Pingo',
                     style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w700,
@@ -211,14 +383,47 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
             Expanded(
               child: ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 children: [
                   if (widget.scenario == FlowScenario.autoSaved) ...[
-                    _buildAutoSavedContent(isDark, cardBg, borderColor, textColor, mutedColor),
-                  ] else if (widget.scenario == FlowScenario.askAboutToday) ...[
-                    _buildAskAboutTodayContent(isDark, cardBg, borderColor, textColor, mutedColor),
+                    _buildAutoSavedContent(
+                        isDark, cardBg, borderColor, textColor, mutedColor),
+                  ] else if (widget.scenario ==
+                      FlowScenario.askAboutToday) ...[
+                    _buildAskAboutTodayContent(
+                        isDark, cardBg, borderColor, textColor, mutedColor),
                   ] else if (widget.scenario == FlowScenario.askQuestion) ...[
-                    _buildAskQuestionContent(isDark, cardBg, borderColor, textColor, mutedColor),
+                    _buildAskQuestionContent(
+                        isDark, cardBg, borderColor, textColor, mutedColor),
+                  ],
+
+                  // Follow up messages stream
+                  for (final msg in _conversationHistory) ...[
+                    const SizedBox(height: 14),
+                    if (msg['isUser'] == true) ...[
+                      _userBubble(msg['text'] as String),
+                    ] else ...[
+                      _botHeader(),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: borderColor, width: 1.2),
+                        ),
+                        child: Text(
+                          msg['text'] as String,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: textColor,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -227,7 +432,8 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
             // Bottom Input Dock
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
-              child: _buildBottomInputDock(isDark, cardBg, borderColor, textColor, hintText),
+              child: _buildBottomInputDock(
+                  isDark, cardBg, borderColor, textColor, hintText),
             ),
           ],
         ),
@@ -290,13 +496,22 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.calendar_today_outlined, size: 16, color: mutedColor),
+                  Icon(Icons.calendar_today_outlined,
+                      size: 16, color: mutedColor),
                   const SizedBox(width: 6),
-                  Text(_taskDate, style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500)),
+                  Text(_taskDate,
+                      style: TextStyle(
+                          fontSize: 14,
+                          color: textColor,
+                          fontWeight: FontWeight.w500)),
                   const SizedBox(width: 14),
                   Icon(Icons.access_time_rounded, size: 16, color: mutedColor),
                   const SizedBox(width: 6),
-                  Text(_taskTime, style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500)),
+                  Text(_taskTime,
+                      style: TextStyle(
+                          fontSize: 14,
+                          color: textColor,
+                          fontWeight: FontWeight.w500)),
                 ],
               ),
             ],
@@ -320,15 +535,22 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Updated',
-                  style: TextStyle(
-                    color: AppColors.pingoPurple,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                  ),
+                Row(
+                  children: const [
+                    Icon(Icons.check_circle,
+                        color: AppColors.success, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Time updated',
+                      style: TextStyle(
+                        color: Color(0xFF047857),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
                   _taskTitle,
                   style: TextStyle(
@@ -341,26 +563,46 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_outlined, size: 16, color: mutedColor),
+                    Icon(Icons.calendar_today_outlined,
+                        size: 16, color: mutedColor),
                     const SizedBox(width: 6),
-                    Text(_taskDate, style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500)),
+                    Text(_taskDate,
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: textColor,
+                            fontWeight: FontWeight.w500)),
                     const SizedBox(width: 14),
-                    Icon(Icons.access_time_rounded, size: 16, color: mutedColor),
+                    Icon(Icons.access_time_rounded,
+                        size: 16, color: mutedColor),
                     const SizedBox(width: 6),
-                    Text(_followUpTime, style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500)),
+                    Text(_followUpTime,
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: textColor,
+                            fontWeight: FontWeight.w500)),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
+                Divider(color: borderColor, height: 1),
+                const SizedBox(height: 14),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.notifications_none_rounded, size: 16, color: mutedColor),
-                    const SizedBox(width: 6),
-                    Text(_reminderAlert, style: TextStyle(fontSize: 14, color: textColor)),
+                    Text(
+                      'Alert',
+                      style: TextStyle(fontSize: 14, color: mutedColor),
+                    ),
+                    Text(
+                      _reminderAlert,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
-                Divider(color: borderColor, height: 1),
-                const SizedBox(height: 12),
                 InkWell(
                   onTap: () {
                     setState(() {
@@ -395,6 +637,7 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
             }),
             _chip('Move to tomorrow', () {
               setState(() => _taskDate = 'Tomorrow');
+              _handleSend('Move to tomorrow');
             }),
             _chip('Add a note', () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -407,7 +650,7 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
     );
   }
 
-  // --- 2. Scenario: Ask About Today (Zero fake items) ---
+  // --- 2. Scenario: Ask About Today / Tomorrow (Zero fake items) ---
   Widget _buildAskAboutTodayContent(
     bool isDark,
     Color cardBg,
@@ -415,10 +658,31 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
     Color textColor,
     Color mutedColor,
   ) {
+    final promptLower = widget.initialPrompt.toLowerCase();
+    final isTomorrow = promptLower.contains('tomorrow') ||
+        promptLower.contains('কাল') ||
+        promptLower.contains('আগামীকাল');
+
+    final targetName = isTomorrow ? 'tomorrow' : 'today';
+
+    final now = DateTime.now();
+    final targetDate = isTomorrow ? now.add(const Duration(days: 1)) : now;
+
+    final reminders = ref.watch(homeReminderProvider).reminders;
+    final matchingTasks = reminders.where((r) {
+      return r.dueAt.year == targetDate.year &&
+          r.dueAt.month == targetDate.month &&
+          r.dueAt.day == targetDate.day;
+    }).toList();
+
+    final userQuestion = widget.initialPrompt.isNotEmpty
+        ? widget.initialPrompt
+        : 'What do I have $targetName?';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _userBubble('What do I have today?'),
+        _userBubble(userQuestion),
         const SizedBox(height: 14),
         _botHeader(),
         const SizedBox(height: 8),
@@ -430,13 +694,14 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: borderColor, width: 1.2),
           ),
-          child: _todayTasks.isEmpty
+          child: matchingTasks.isEmpty
               ? Column(
                   children: [
-                    const Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 36),
+                    const Icon(Icons.check_circle_outline_rounded,
+                        color: AppColors.success, size: 36),
                     const SizedBox(height: 12),
                     Text(
-                      'No tasks left for today!',
+                      'No tasks left for $targetName!',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -458,7 +723,7 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'You have ${_todayTasks.where((t) => !t['done']).length} things left today.',
+                      'You have ${matchingTasks.where((t) => !t.isDone).length} things scheduled for $targetName.',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -467,13 +732,14 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
                     ),
                     const SizedBox(height: 14),
                     Divider(color: borderColor, height: 1),
-                    ..._todayTasks.map((task) => _checklistItem(
-                          title: task['title'],
-                          time: task['time'],
-                          isCompleted: task['done'],
+                    ...matchingTasks.map((task) => _checklistItem(
+                          title: task.title,
+                          time: DateFormat.jm().format(task.dueAt),
+                          isCompleted: task.isDone,
                           onToggle: () {
-                            setState(() => task['done'] = !task['done']);
-                            _scrollToBottom();
+                            ref
+                                .read(homeReminderProvider.notifier)
+                                .toggleDone(task.id);
                           },
                           textColor: textColor,
                           mutedColor: mutedColor,
@@ -489,15 +755,16 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _chip('What about tomorrow?', () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Checking tomorrow’s schedule')),
-              );
-            }),
-            _chip('Anything overdue?', () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Zero overdue items!')),
-              );
+            if (!isTomorrow)
+              _chip('What about tomorrow?', () {
+                _handleSend('What do I have tomorrow?');
+              }),
+            if (isTomorrow)
+              _chip('What about today?', () {
+                _handleSend('What do I have today?');
+              }),
+            _chip('Show all tasks', () {
+              _handleSend('Show all tasks');
             }),
           ],
         ),
@@ -518,6 +785,7 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
       children: [
         _userBubble(_taskTitle),
         const SizedBox(height: 14),
+
         _botHeader(),
         const SizedBox(height: 8),
 
@@ -534,9 +802,9 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
               const Text(
                 'Not saved yet',
                 style: TextStyle(
-                  color: Color(0xFFB45309),
-                  fontSize: 13.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
+                  color: Color(0xFFD97706),
                 ),
               ),
               const SizedBox(height: 8),
@@ -544,9 +812,9 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
                 'What time should I remind you?',
                 style: TextStyle(
                   fontSize: 19,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: textColor,
-                  letterSpacing: -0.2,
+                  letterSpacing: -0.3,
                 ),
               ),
               const SizedBox(height: 16),
@@ -559,8 +827,15 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
 
               const SizedBox(height: 14),
               InkWell(
-                onTap: () {
-                  showTimePicker(context: context, initialTime: const TimeOfDay(hour: 9, minute: 0));
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: const TimeOfDay(hour: 9, minute: 0),
+                  );
+                  if (picked != null) {
+                    final formatted = picked.format(context);
+                    _saveQuestionTime(formatted);
+                  }
                 },
                 child: const Text(
                   'Pick another time',
@@ -590,7 +865,8 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                const Icon(Icons.check_circle,
+                    color: AppColors.success, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   'Saved! Reminding you at $_selectedTime',
@@ -642,7 +918,8 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
             shape: BoxShape.circle,
           ),
           child: const Center(
-            child: Icon(Icons.notifications_rounded, color: AppColors.pingoPurple, size: 16),
+            child: Icon(Icons.notifications_rounded,
+                color: AppColors.pingoPurple, size: 16),
           ),
         ),
         const SizedBox(width: 8),
@@ -674,13 +951,15 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
         child: Row(
           children: [
             isCompleted
-                ? const Icon(Icons.check_circle, color: AppColors.success, size: 22)
+                ? const Icon(Icons.check_circle,
+                    color: AppColors.success, size: 22)
                 : Container(
                     width: 20,
                     height: 20,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF9CA3AF), width: 1.6),
+                      border: Border.all(
+                          color: const Color(0xFF9CA3AF), width: 1.6),
                     ),
                   ),
             const SizedBox(width: 12),
@@ -713,8 +992,7 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
     final isSelected = _selectedTime == timeText;
     return InkWell(
       onTap: () {
-        setState(() => _selectedTime = timeText);
-        _scrollToBottom();
+        _saveQuestionTime(timeText);
       },
       borderRadius: BorderRadius.circular(24),
       child: Container(
@@ -793,7 +1071,8 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
               style: TextStyle(color: textColor, fontSize: 15),
               decoration: InputDecoration(
                 hintText: hintText,
-                hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14.5),
+                hintStyle:
+                    const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14.5),
                 border: InputBorder.none,
               ),
             ),

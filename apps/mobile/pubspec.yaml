@@ -27,6 +27,8 @@ dependencies:
   # Utilities
   uuid: ^4.4.0
   speech_to_text: ^7.5.0
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
 dev_dependencies:
   flutter_test:
     sdk: flutter

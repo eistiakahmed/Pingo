@@ -42,12 +42,24 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
     _inputController.clear();
 
     final lower = trimmed.toLowerCase();
+
+    // Task inquiry detection (today, tomorrow, all tasks)
+    final isQueryTasks = lower.contains('what do i have') ||
+        lower.contains('task') ||
+        lower.contains('tasks') ||
+        lower.contains('schedule') ||
+        lower.contains('কী আছে') ||
+        lower.contains('কি আছে') ||
+        lower.contains('টাস্ক') ||
+        (lower.contains('what') && lower.contains('tomorrow')) ||
+        (lower.contains('what') && lower.contains('today'));
+
     final hasTimeOrDate = RegExp(
       r'(\b\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)\b|\b(tomorrow|today|tonight|alarm|reminder|meeting|doctor|medicine|bill)\b|[০-৯\d]+(\s*:\s*[০-৯\d]+)?\s*টা|কাল|আগামীকাল|পরশু|আজ|সকাল|বিকাল|সন্ধ্যা|রাত|ঔষধ|বিল|মিটিং|নামাজ)',
       caseSensitive: false,
     ).hasMatch(trimmed);
 
-    if (lower.contains('what do i have') || lower.contains('ask about today') || trimmed == 'What do I have today?') {
+    if (isQueryTasks) {
       PingoFlowScreen.open(context, scenario: FlowScenario.askAboutToday, prompt: trimmed);
     } else if (hasTimeOrDate) {
       PingoFlowScreen.open(context, scenario: FlowScenario.autoSaved, prompt: trimmed);
