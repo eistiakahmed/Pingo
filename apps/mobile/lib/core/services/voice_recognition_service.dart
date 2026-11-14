@@ -31,9 +31,11 @@ class VoiceRecognitionService {
   }
 
   /// Starts listening for spoken words and returns transcribed words in real-time.
+  /// Uses continuous dictation mode with extended pause thresholds for long voice notes.
   Future<void> startListening({
     required Function(String recognizedWords) onResult,
     Function(double soundLevel)? onSoundLevelChange,
+    Function(String status)? onStatusChange,
     String? localeId,
   }) async {
     final ready = await initialize();
@@ -50,12 +52,12 @@ class VoiceRecognitionService {
           }
         },
         localeId: localeId,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
+        listenFor: const Duration(minutes: 5),
+        pauseFor: const Duration(seconds: 10),
         partialResults: true,
         onSoundLevelChange: onSoundLevelChange,
-        cancelOnError: true,
-        listenMode: stt.ListenMode.confirmation,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.dictation,
       );
     } catch (e) {
       debugPrint('[VoiceRecognition] Error starting listen: $e');

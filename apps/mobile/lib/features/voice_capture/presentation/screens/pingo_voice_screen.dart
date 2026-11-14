@@ -27,6 +27,7 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
     with SingleTickerProviderStateMixin {
   String _currentLanguage = 'English + বাংলা';
   String _liveSpeechText = '';
+  String _accumulatedPrefix = '';
   bool _isListening = false;
   double _soundLevel = 0.0;
   late AnimationController _animController;
@@ -62,6 +63,9 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
   Future<void> _startVoiceRecognition() async {
     setState(() {
       _isListening = true;
+      if (_liveSpeechText.isNotEmpty && !_liveSpeechText.endsWith(' ')) {
+        _accumulatedPrefix = '$_liveSpeechText ';
+      }
     });
 
     await VoiceRecognitionService.instance.startListening(
@@ -69,7 +73,7 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
       onResult: (words) {
         if (mounted) {
           setState(() {
-            _liveSpeechText = words;
+            _liveSpeechText = '$_accumulatedPrefix$words'.trim();
           });
         }
       },
@@ -80,7 +84,26 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
           });
         }
       },
+      onStatusChange: (status) {
+        if (mounted && (status == 'done' || status == 'notListening')) {
+          setState(() {
+            _isListening = false;
+          });
+        }
+      },
     );
+  }
+
+  Future<void> _pauseListening() async {
+    await VoiceRecognitionService.instance.stopListening();
+    if (mounted) {
+      setState(() {
+        _isListening = false;
+        if (_liveSpeechText.isNotEmpty && !_liveSpeechText.endsWith(' ')) {
+          _accumulatedPrefix = '$_liveSpeechText ';
+        }
+      });
+    }
   }
 
   void _finishVoice([String? customText]) async {
@@ -271,26 +294,35 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
                             color: AppColors.pingoPurple.withValues(alpha: 0.12),
                           ),
                         ),
-                        // Core solid button with soundwaves
-                        Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.pingoPurple,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.pingoPurple.withValues(alpha: 0.35),
-                                blurRadius: 28,
-                                offset: const Offset(0, 10),
+                        // Core solid button with soundwaves / Tap to Pause or Resume
+                        GestureDetector(
+                          onTap: () {
+                            if (_isListening) {
+                              _pauseListening();
+                            } else {
+                              _startVoiceRecognition();
+                            }
+                          },
+                          child: Container(
+                            width: 140,
+                            height: 140,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _isListening ? AppColors.pingoPurple : const Color(0xFF6B7280),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (_isListening ? AppColors.pingoPurple : const Color(0xFF6B7280)).withValues(alpha: 0.35),
+                                  blurRadius: 28,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Icon(
+                                _isListening ? Icons.graphic_eq_rounded : Icons.mic_rounded,
+                                color: Colors.white,
+                                size: 58,
                               ),
-                            ],
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.graphic_eq_rounded,
-                              color: Colors.white,
-                              size: 58,
                             ),
                           ),
                         ),

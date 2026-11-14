@@ -22,7 +22,7 @@ class ReminderPriority(str, enum.Enum):
 class ParseReminderRequest(BaseModel):
     text: str = Field(
         min_length=1,
-        max_length=1000,
+        max_length=5000,
         description="User natural language utterance in English, Bengali, or Banglish",
     )
     timezone: str = Field(
