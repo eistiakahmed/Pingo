@@ -9,9 +9,11 @@ class VoiceRecognitionService {
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isInitialized = false;
+  List<stt.LocaleName> _supportedLocales = [];
 
   bool get isListening => _speech.isListening;
   bool get isAvailable => _isInitialized;
+  List<stt.LocaleName> get supportedLocales => _supportedLocales;
 
   /// Initializes speech recognition engine and requests microphone permissions.
   Future<bool> initialize() async {
@@ -23,11 +25,44 @@ class VoiceRecognitionService {
         onError: (error) => debugPrint('[VoiceRecognition] Error: $error'),
       );
 
+      if (_isInitialized) {
+        _supportedLocales = await _speech.locales();
+        debugPrint('[VoiceRecognition] Found ${_supportedLocales.length} speech locales');
+      }
+
       return _isInitialized;
     } catch (e) {
       debugPrint('[VoiceRecognition] Exception during init: $e');
       return false;
     }
+  }
+
+  /// Finds the best available matching locale for a given language code ('bn' or 'en').
+  String? findBestLocale(String langCode) {
+    if (_supportedLocales.isEmpty) return null;
+
+    final target = langCode.toLowerCase().trim();
+    if (target == 'bn' || target == 'bangla') {
+      // 1. Exact match for Bangladesh
+      for (final loc in _supportedLocales) {
+        final id = loc.localeId.toLowerCase();
+        if (id == 'bn_bd' || id == 'bn-bd') return loc.localeId;
+      }
+      // 2. Any Bengali locale (bn_IN, etc.)
+      for (final loc in _supportedLocales) {
+        if (loc.localeId.toLowerCase().startsWith('bn')) return loc.localeId;
+      }
+    } else if (target == 'en' || target == 'english') {
+      for (final loc in _supportedLocales) {
+        final id = loc.localeId.toLowerCase();
+        if (id == 'en_us' || id == 'en-us') return loc.localeId;
+      }
+      for (final loc in _supportedLocales) {
+        if (loc.localeId.toLowerCase().startsWith('en')) return loc.localeId;
+      }
+    }
+
+    return null;
   }
 
   /// Starts listening for spoken words and returns transcribed words in real-time.

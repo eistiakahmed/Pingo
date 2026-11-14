@@ -38,3 +38,4 @@ echo "✅ Server dependencies installed successfully!"
 echo "👉 If running for the first time, log out and log back in,"
 echo "   or run: newgrp docker"
 echo "========================================================"
+

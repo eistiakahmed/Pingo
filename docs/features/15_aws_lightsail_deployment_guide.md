@@ -58,3 +58,4 @@ Secrets must **never** be checked into git. On the Lightsail server, an `.env.pr
 - `AI_PROVIDER`: `deepseek`
 - `DEEPSEEK_API_KEY`: Runtime DeepSeek API key
 - `DOMAIN_NAME`: Custom domain or server IP
+

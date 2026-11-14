@@ -55,3 +55,4 @@ This specification details the real-time hardware voice recognition and speech-t
 - Runtime permission request via `permission_handler`.
 - If microphone permission is permanently denied or hardware unavailable, the user is offered the manual `"Type"` dialog fallback.
 - Audio visualization scales dynamically with `_soundLevel` (decibel input).
+

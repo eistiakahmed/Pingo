@@ -55,9 +55,21 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
   }
 
   String? _getLocaleId() {
-    if (_currentLanguage == 'বাংলা') return 'bn_BD';
-    if (_currentLanguage == 'English') return 'en_US';
-    return null; // Device default
+    if (_currentLanguage == 'বাংলা') {
+      return VoiceRecognitionService.instance.findBestLocale('bn') ?? 'bn_BD';
+    }
+    return VoiceRecognitionService.instance.findBestLocale('en') ?? 'en_US';
+  }
+
+  void _setLanguage(String lang) async {
+    if (_currentLanguage == lang) return;
+    await VoiceRecognitionService.instance.stopListening();
+    setState(() {
+      _currentLanguage = lang;
+      _liveSpeechText = '';
+      _accumulatedPrefix = '';
+    });
+    _startVoiceRecognition();
   }
 
   Future<void> _startVoiceRecognition() async {
@@ -151,18 +163,29 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
     );
   }
 
-  void _toggleLanguage() async {
-    await VoiceRecognitionService.instance.stopListening();
-    setState(() {
-      if (_currentLanguage == 'English + বাংলা') {
-        _currentLanguage = 'বাংলা';
-      } else if (_currentLanguage == 'বাংলা') {
-        _currentLanguage = 'English';
-      } else {
-        _currentLanguage = 'English + বাংলা';
-      }
-    });
-    _startVoiceRecognition();
+  Widget _langPill(String label, String langCode, bool isDark) {
+    final isSelected = _currentLanguage == langCode;
+    return GestureDetector(
+      onTap: () => _setLanguage(langCode),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          color: isSelected ? AppColors.pingoPurple : Colors.transparent,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected
+                ? Colors.white
+                : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -203,27 +226,23 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
                       ),
                     ),
                   ),
-                  InkWell(
-                    onTap: _toggleLanguage,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isDark ? AppColors.darkBorder : const Color(0xFFE5E7EB),
-                          width: 1.2,
-                        ),
-                        color: isDark ? AppColors.darkSurface : Colors.white,
+                  // Segmented Bilingual Pill (বাংলা | English)
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: isDark ? AppColors.darkBorder : const Color(0xFFE5E7EB),
+                        width: 1.2,
                       ),
-                      child: Text(
-                        _currentLanguage,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : AppColors.pingoDark,
-                        ),
-                      ),
+                      color: isDark ? AppColors.darkSurface : Colors.white,
+                    ),
+                    padding: const EdgeInsets.all(3),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _langPill('বাংলা', 'বাংলা', isDark),
+                        _langPill('English', 'English', isDark),
+                      ],
                     ),
                   ),
                 ],
@@ -233,7 +252,9 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
 
               // Status & Realtime Transcribed Text
               Text(
-                _isListening ? 'Listening...' : 'Tap to speak',
+                _isListening
+                    ? (_currentLanguage == 'বাংলা' ? 'শুনছি...' : 'Listening...')
+                    : (_currentLanguage == 'বাংলা' ? 'বলার জন্য ট্যাপ করুন' : 'Tap to speak'),
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -246,7 +267,9 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
               Text(
                 _liveSpeechText.isNotEmpty
                     ? _liveSpeechText
-                    : 'What should I remember for you?',
+                    : (_currentLanguage == 'বাংলা'
+                        ? 'আপনার রিমাইন্ডারটি বাংলায় বলুন...'
+                        : 'What should I remember for you?'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 26,
@@ -336,7 +359,9 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
 
               // Caption
               Text(
-                'Speak naturally. I will save it when you stop.',
+                _currentLanguage == 'বাংলা'
+                    ? 'স্বাভাবিকভাবে বলুন, কথা থামালে সেভ হয়ে যাবে।'
+                    : 'Speak naturally. I will save it when you stop.',
                 style: TextStyle(
                   fontSize: 14.5,
                   color: isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted,
@@ -364,7 +389,7 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
                         color: isDark ? AppColors.darkSurface : Colors.white,
                       ),
                       child: Text(
-                        'Cancel',
+                        _currentLanguage == 'বাংলা' ? 'বাতিল' : 'Cancel',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -419,7 +444,7 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
                         color: isDark ? AppColors.darkSurface : Colors.white,
                       ),
                       child: Text(
-                        'Type',
+                        _currentLanguage == 'বাংলা' ? 'লিখুন' : 'Type',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,

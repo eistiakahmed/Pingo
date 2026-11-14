@@ -42,12 +42,17 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
     _inputController.clear();
 
     final lower = trimmed.toLowerCase();
-    if (lower.contains('today') || lower.contains('have')) {
+    final hasTimeOrDate = RegExp(
+      r'(\b\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)\b|\b(tomorrow|today|tonight|alarm|reminder|meeting|doctor|medicine|bill)\b|[০-৯\d]+(\s*:\s*[০-৯\d]+)?\s*টা|কাল|আগামীকাল|পরশু|আজ|সকাল|বিকাল|সন্ধ্যা|রাত|ঔষধ|বিল|মিটিং|নামাজ)',
+      caseSensitive: false,
+    ).hasMatch(trimmed);
+
+    if (lower.contains('what do i have') || lower.contains('ask about today') || trimmed == 'What do I have today?') {
       PingoFlowScreen.open(context, scenario: FlowScenario.askAboutToday, prompt: trimmed);
-    } else if (lower.contains('rahim') || (!lower.contains('pm') && !lower.contains('am') && !lower.contains('at') && !lower.contains('tomorrow'))) {
-      PingoFlowScreen.open(context, scenario: FlowScenario.askQuestion, prompt: trimmed);
-    } else {
+    } else if (hasTimeOrDate) {
       PingoFlowScreen.open(context, scenario: FlowScenario.autoSaved, prompt: trimmed);
+    } else {
+      PingoFlowScreen.open(context, scenario: FlowScenario.askQuestion, prompt: trimmed);
     }
   }
 

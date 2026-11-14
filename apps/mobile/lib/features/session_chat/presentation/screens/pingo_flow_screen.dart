@@ -65,15 +65,38 @@ class _PingoFlowScreenState extends State<PingoFlowScreen> {
     _taskDate = 'Today';
     _taskTime = 'Scheduled';
 
-    // Simple natural parser for prompt dates/times
-    final lower = prompt.toLowerCase();
-    if (lower.contains('tomorrow')) {
+    // Normalize Bangla digits to standard numerals
+    final Map<String, String> bnDigits = {
+      '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5',
+      '৬': '6', '৭': '7', '৮': '8', '৯': '9', '০': '0'
+    };
+    String normalized = prompt;
+    bnDigits.forEach((k, v) => normalized = normalized.replaceAll(k, v));
+    final lower = normalized.toLowerCase();
+
+    // Dates
+    if (lower.contains('tomorrow') || lower.contains('কাল') || lower.contains('আগামীকাল')) {
       _taskDate = 'Tomorrow';
+    } else if (lower.contains('পরশু')) {
+      _taskDate = 'Day after tomorrow';
     } else if (lower.contains('10th')) {
       _taskDate = '10th of this month';
     }
 
-    if (lower.contains('5 pm') || lower.contains('5:00')) {
+    // Dynamic Time Matcher (e.g. 9:00 a.m., 9 am, 9:00, ৯টা)
+    final timeMatch = RegExp(r'(\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)|\b\d{1,2}(:\d{2})?\b(?=\s*টা))', caseSensitive: false).firstMatch(lower);
+    if (timeMatch != null) {
+      String raw = timeMatch.group(0)!.replaceAll('.', '').toUpperCase().trim();
+      if (raw.contains('PM') || raw.contains('AM')) {
+        _taskTime = raw;
+      } else if (lower.contains('সকাল') || lower.contains('morning')) {
+        _taskTime = raw.contains(':') ? '$raw AM' : '$raw:00 AM';
+      } else if (lower.contains('রাত') || lower.contains('সন্ধ্যা') || lower.contains('বিকাল') || lower.contains('night') || lower.contains('evening')) {
+        _taskTime = raw.contains(':') ? '$raw PM' : '$raw:00 PM';
+      } else {
+        _taskTime = raw.contains(':') ? '$raw AM' : '$raw:00 AM';
+      }
+    } else if (lower.contains('5 pm') || lower.contains('5:00')) {
       _taskTime = '5:00 PM';
     } else if (lower.contains('9 pm') || lower.contains('9:00')) {
       _taskTime = '9:00 PM';
