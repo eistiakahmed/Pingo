@@ -196,7 +196,7 @@ class _ConfirmationCardState extends State<ConfirmationCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'AI স্মার্ট রিমাইন্ডার নিশ্চিতকরণ',
+                    'স্মার্ট রিমাইন্ডার নিশ্চিতকরণ',
                     style: AppTypography.titleMedium(
                       color: isDark
                           ? AppColors.darkTextPrimary

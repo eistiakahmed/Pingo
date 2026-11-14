@@ -433,22 +433,31 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
       );
       final isPermitted =
           await NotificationService.instance.areNotificationsEnabled();
+      final isExactAllowed =
+          await NotificationService.instance.canScheduleExactAlarms();
+
       setState(() {
         _conversationHistory.add({
           'isUser': true,
           'text': trimmed,
         });
-        if (isPermitted) {
+        if (isPermitted && isExactAllowed) {
           _conversationHistory.add({
             'isUser': false,
             'text':
-                '🔔 I just triggered an instant test alert on your screen!\n\nIf you see the notification banner and hear the sound, notifications are working perfectly.',
+                '🔔 Instant test alert sent!\n\nAll notification and exact alarm permissions are active. Your punctual reminders will fire on time.',
+          });
+        } else if (!isPermitted) {
+          _conversationHistory.add({
+            'isUser': false,
+            'text':
+                '⚠️ Notifications are currently BLOCKED in your phone settings.\n\nPlease open Settings > Apps > Pingo > Notifications and turn on:\n• Allow notifications\n• Floating notifications (heads-up banners)\n• Lock screen notifications',
           });
         } else {
           _conversationHistory.add({
             'isUser': false,
             'text':
-                '⚠️ Notifications are currently BLOCKED in your phone settings.\n\nPlease open your phone\'s Settings > Apps > Pingo > Notifications and turn on:\n• Allow notifications\n• Floating notifications (banners)\n• Lock screen notifications',
+                '⚠️ Exact Alarms permission is restricted on your device.\n\nPlease open Settings > Apps > Pingo > Alarms & reminders and allow "Setting alarms and reminders" for exact timing.',
           });
         }
       });
@@ -460,7 +469,10 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
     final isCancel = lower.contains('cancel') ||
         lower.contains('delete') ||
         lower.contains('remove') ||
-        lower.contains('বাতিল');
+        lower.contains('বাতিল') ||
+        lower.contains('ক্যান্সেল') ||
+        lower.contains('মুছে') ||
+        lower.contains('বাদ');
     if (isCancel) {
       String? toDeleteId = _lastCreatedReminderId;
       if (toDeleteId == null) {
@@ -551,32 +563,34 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
 
     // 3. User answering "What time should I remind you?" when in askQuestion mode
     if (_activeScenario == FlowScenario.askQuestion) {
-      final dueAt = _calculateDueAt('Today', trimmed);
-      final newId = const Uuid().v4();
-      final item = ReminderItem(
-        id: newId,
-        title: _taskTitle,
-        dueAt: dueAt,
-        category: _inferCategory(_taskTitle),
-      );
-      ref.read(homeReminderProvider.notifier).addReminder(item);
-      _lastCreatedReminderId = newId;
+      if (_hasTimeHeuristic(trimmed)) {
+        final dueAt = _calculateDueAt('Today', trimmed);
+        final newId = const Uuid().v4();
+        final item = ReminderItem(
+          id: newId,
+          title: _taskTitle,
+          dueAt: dueAt,
+          category: _inferCategory(_taskTitle),
+        );
+        ref.read(homeReminderProvider.notifier).addReminder(item);
+        _lastCreatedReminderId = newId;
 
-      setState(() {
-        _activeScenario = FlowScenario.autoSaved;
-        _taskTime = DateFormat.jm().format(dueAt);
-        _conversationHistory.add({
-          'isUser': true,
-          'text': trimmed,
+        setState(() {
+          _activeScenario = FlowScenario.autoSaved;
+          _taskTime = DateFormat.jm().format(dueAt);
+          _conversationHistory.add({
+            'isUser': true,
+            'text': trimmed,
+          });
+          _conversationHistory.add({
+            'isUser': false,
+            'text':
+                'Saved: "$_taskTitle" at ${DateFormat.jm().format(dueAt)} (${_formatAiDate(dueAt)}).',
+          });
         });
-        _conversationHistory.add({
-          'isUser': false,
-          'text':
-              'Saved: "$_taskTitle" at ${DateFormat.jm().format(dueAt)} (${_formatAiDate(dueAt)}).',
-        });
-      });
-      _scrollToBottom();
-      return;
+        _scrollToBottom();
+        return;
+      }
     }
 
     // 4. Time or date modification requests (e.g. "move to 5 pm", "modify date")
@@ -619,7 +633,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
       return;
     }
 
-    // 5. Natural language reminder using AI!
+    // 5. Natural language reminder parsing
     setState(() {
       _conversationHistory.add({
         'isUser': true,
@@ -627,7 +641,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
       });
       _conversationHistory.add({
         'isUser': false,
-        'text': 'Pingo is thinking...',
+        'text': 'Organizing...',
         'isLoading': true,
       });
     });
@@ -768,34 +782,13 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Pingo',
+                    'Pingo 🐧',
                     style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w700,
                       color: textColor,
                     ),
                   ),
-                  if (_isLoadingAi) ...[
-                    const Spacer(),
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(AppColors.penguinBeak),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'AI',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.penguinBeak,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -917,7 +910,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                 ),
                 const SizedBox(width: 14),
                 Text(
-                  'Scheduling with AI...',
+                  'Pingo is remembering...',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

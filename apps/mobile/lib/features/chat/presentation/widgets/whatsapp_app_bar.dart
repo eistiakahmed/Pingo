@@ -82,7 +82,7 @@ class WhatsAppAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'online • AI Memory Assistant',
+                  'online • Personal Memory Assistant',
                   style: TextStyle(
                     color: Color(0xFFE2F4EE),
                     fontSize: 12.5,

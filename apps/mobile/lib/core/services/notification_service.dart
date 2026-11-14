@@ -135,6 +135,7 @@ class NotificationService {
   }
 
   /// Schedules a punctual notification at the specified [scheduledDate].
+  /// Alarms are always scheduled for the future in Android AlarmManager and NEVER trigger immediately at creation time.
   Future<void> scheduleReminder({
     required int id,
     required String title,
@@ -159,8 +160,9 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.reminder,
+      category: AndroidNotificationCategory.alarm,
       ticker: title,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
     );
 
     const darwinDetails = DarwinNotificationDetails(
@@ -176,80 +178,87 @@ class NotificationService {
       macOS: darwinDetails,
     );
 
-    final now = DateTime.now();
-    // If the scheduled date is now, in the past, or within the next 15 seconds, show the alert immediately!
-    if (scheduledDate.isBefore(now.add(const Duration(seconds: 15)))) {
-      debugPrint(
-          '[NotificationService] Trigger date $scheduledDate is immediate or within 15s. Showing alert now!');
-      await _notificationsPlugin.show(
-        safeId,
-        title,
-        body,
-        notificationDetails,
-        payload: 'reminder_$safeId',
-      );
-      return;
-    }
-
     try {
-      final tzDateTime = tz.TZDateTime.from(scheduledDate, tz.local);
-      final tzNow = tz.TZDateTime.now(tz.local);
+      final tz.TZDateTime tzNow = tz.TZDateTime.now(tz.local);
+      tz.TZDateTime targetTz = tz.TZDateTime.from(scheduledDate, tz.local);
 
-      // If timezone converted date is within 5 seconds of now or in the past, show immediately!
-      if (tzDateTime.isBefore(tzNow.add(const Duration(seconds: 5)))) {
+      // If scheduled time is within 10 seconds of now or in the past (e.g. current minute ticking away),
+      // push it forward to at least 15 seconds from now so it is guaranteed to be in the future
+      // and satisfies Android AlarmManager requirements.
+      if (targetTz.isBefore(tzNow.add(const Duration(seconds: 10)))) {
+        targetTz = tzNow.add(const Duration(seconds: 15));
         debugPrint(
-            '[NotificationService] tzDateTime ($tzDateTime) is too close to now. Showing alert now!');
-        await _notificationsPlugin.show(
-          safeId,
-          title,
-          body,
-          notificationDetails,
-          payload: 'reminder_$safeId',
-        );
-        return;
+            '[NotificationService] Target date was too close to current time. Pushed forward to: $targetTz');
       }
+
+      // Check whether exact alarms are permitted on this device
+      bool canExact = true;
+      if (!kIsWeb && Platform.isAndroid) {
+        final androidPlugin = _notificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>();
+        canExact = await androidPlugin?.canScheduleExactNotifications() ?? true;
+        if (!canExact) {
+          debugPrint(
+              '[NotificationService] Exact alarms not permitted by OS. Prompting user...');
+          await androidPlugin?.requestExactAlarmsPermission();
+        }
+      }
+
+      final scheduleMode = canExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
 
       await _notificationsPlugin.zonedSchedule(
         safeId,
         title,
         body,
-        tzDateTime,
+        targetTz,
         notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: scheduleMode,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         payload: 'reminder_$safeId',
       );
 
       debugPrint(
-          '[NotificationService] Successfully scheduled reminder #$safeId for $tzDateTime (local epoch: ${tzDateTime.millisecondsSinceEpoch}): "$title"');
+          '[NotificationService] Successfully scheduled reminder #$safeId for $targetTz with mode $scheduleMode');
     } catch (e) {
-      debugPrint('[NotificationService] Exact alarm failed, trying inexact fallback: $e');
+      debugPrint('[NotificationService] Primary schedule failed: $e. Retrying with safe fallback...');
       try {
-        final tzDateTime = tz.TZDateTime.from(scheduledDate, tz.local);
+        final tz.TZDateTime tzNow = tz.TZDateTime.now(tz.local);
+        final fallbackTz = tzNow.add(const Duration(seconds: 15));
         await _notificationsPlugin.zonedSchedule(
           safeId,
           title,
           body,
-          tzDateTime,
+          fallbackTz,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
           payload: 'reminder_$safeId',
         );
+        debugPrint('[NotificationService] Fallback scheduled for $fallbackTz');
       } catch (fallbackError) {
-        debugPrint(
-            '[NotificationService] Inexact schedule failed ($fallbackError). Showing alert now.');
-        await _notificationsPlugin.show(
-          safeId,
-          title,
-          body,
-          notificationDetails,
-          payload: 'reminder_$safeId',
-        );
+        debugPrint('[NotificationService] Fatal: could not register alarm with AlarmManager: $fallbackError');
       }
     }
+  }
+
+  /// Checks if exact alarms are permitted on Android.
+  Future<bool> canScheduleExactAlarms() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      final androidImplementation = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImplementation != null) {
+        final canExact =
+            await androidImplementation.canScheduleExactNotifications();
+        return canExact ?? false;
+      }
+    }
+    return true;
   }
 
   /// Checks if notifications are permitted on the device.
