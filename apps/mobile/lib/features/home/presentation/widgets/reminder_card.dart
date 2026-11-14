@@ -73,7 +73,7 @@ class ReminderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
         border: Border.all(
           color: reminder.isOverdue
-              ? AppColors.overdue.withOpacity(0.5)
+              ? AppColors.overdue.withValues(alpha: 0.5)
               : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
         ),
       ),
@@ -173,7 +173,7 @@ class ReminderCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: isDark
                               ? AppColors.darkBorder
-                              : AppColors.lightBorder.withOpacity(0.5),
+                              : AppColors.lightBorder.withValues(alpha: 0.5),
                           borderRadius:
                               BorderRadius.circular(AppConstants.radiusSmall),
                         ),
@@ -206,7 +206,7 @@ class ReminderCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: categoryColor.withOpacity(0.12),
+                          color: categoryColor.withValues(alpha: 0.12),
                           borderRadius:
                               BorderRadius.circular(AppConstants.radiusSmall),
                         ),

@@ -182,7 +182,7 @@ class _ConfirmationCardState extends State<ConfirmationCard> {
               Container(
                 padding: const EdgeInsets.all(AppConstants.spacing8),
                 decoration: BoxDecoration(
-                  color: AppColors.brandPrimary.withOpacity(0.12),
+                  color: AppColors.brandPrimary.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -256,7 +256,7 @@ class _ConfirmationCardState extends State<ConfirmationCard> {
                 decoration: BoxDecoration(
                   color: isDark
                       ? AppColors.darkBorder
-                      : AppColors.lightBorder.withOpacity(0.6),
+                      : AppColors.lightBorder.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
                 ),
                 child: Row(
@@ -279,7 +279,7 @@ class _ConfirmationCardState extends State<ConfirmationCard> {
                 decoration: BoxDecoration(
                   color: isDark
                       ? AppColors.darkBorder
-                      : AppColors.lightBorder.withOpacity(0.6),
+                      : AppColors.lightBorder.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
                 ),
                 child: Row(
@@ -300,7 +300,7 @@ class _ConfirmationCardState extends State<ConfirmationCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: categoryColor.withOpacity(0.12),
+                  color: categoryColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
                 ),
                 child: Row(
@@ -323,7 +323,7 @@ class _ConfirmationCardState extends State<ConfirmationCard> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withOpacity(0.12),
+                    color: AppColors.info.withValues(alpha: 0.12),
                     borderRadius:
                         BorderRadius.circular(AppConstants.radiusSmall),
                   ),

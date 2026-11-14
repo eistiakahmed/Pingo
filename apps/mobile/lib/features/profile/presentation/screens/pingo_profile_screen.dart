@@ -311,7 +311,7 @@ class _PingoProfileScreenState extends State<PingoProfileScreen> {
           Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor)),
           Switch(
             value: value,
-            activeColor: AppColors.pingoPurple,
+            activeThumbColor: AppColors.pingoPurple,
             onChanged: onChanged,
           ),
         ],

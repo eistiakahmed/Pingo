@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:pingo_mobile/core/services/voice_recognition_service.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
 
-/// Fullscreen Voice Capture screen with zero demo data.
+/// Fullscreen Voice Capture screen with live hardware Speech-to-Text audio capture.
 class PingoVoiceScreen extends StatefulWidget {
   final Function(String speechText)? onSpeechFinished;
 
@@ -25,7 +26,9 @@ class PingoVoiceScreen extends StatefulWidget {
 class _PingoVoiceScreenState extends State<PingoVoiceScreen>
     with SingleTickerProviderStateMixin {
   String _currentLanguage = 'English + বাংলা';
-  String _liveSpeechText = ''; // Clean: Starts empty, dynamically populated
+  String _liveSpeechText = '';
+  bool _isListening = false;
+  double _soundLevel = 0.0;
   late AnimationController _animController;
   final TextEditingController _typeController = TextEditingController();
 
@@ -36,18 +39,56 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startVoiceRecognition();
+    });
   }
 
   @override
   void dispose() {
+    VoiceRecognitionService.instance.cancelListening();
     _animController.dispose();
     _typeController.dispose();
     super.dispose();
   }
 
-  void _finishVoice([String? customText]) {
+  String? _getLocaleId() {
+    if (_currentLanguage == 'বাংলা') return 'bn_BD';
+    if (_currentLanguage == 'English') return 'en_US';
+    return null; // Device default
+  }
+
+  Future<void> _startVoiceRecognition() async {
+    setState(() {
+      _isListening = true;
+    });
+
+    await VoiceRecognitionService.instance.startListening(
+      localeId: _getLocaleId(),
+      onResult: (words) {
+        if (mounted) {
+          setState(() {
+            _liveSpeechText = words;
+          });
+        }
+      },
+      onSoundLevelChange: (level) {
+        if (mounted) {
+          setState(() {
+            _soundLevel = level;
+          });
+        }
+      },
+    );
+  }
+
+  void _finishVoice([String? customText]) async {
+    await VoiceRecognitionService.instance.stopListening();
     final text = customText ?? (_liveSpeechText.trim().isNotEmpty ? _liveSpeechText.trim() : 'New reminder');
-    Navigator.of(context).pop();
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
     if (widget.onSpeechFinished != null) {
       widget.onSpeechFinished!(text);
     }
@@ -87,7 +128,8 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
     );
   }
 
-  void _toggleLanguage() {
+  void _toggleLanguage() async {
+    await VoiceRecognitionService.instance.stopListening();
     setState(() {
       if (_currentLanguage == 'English + বাংলা') {
         _currentLanguage = 'বাংলা';
@@ -97,6 +139,7 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
         _currentLanguage = 'English + বাংলা';
       }
     });
+    _startVoiceRecognition();
   }
 
   @override
@@ -166,9 +209,9 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
               const Spacer(flex: 2),
 
               // Status & Realtime Transcribed Text
-              const Text(
-                'Listening...',
-                style: TextStyle(
+              Text(
+                _isListening ? 'Listening...' : 'Tap to speak',
+                style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: AppColors.pingoPurple,
@@ -199,7 +242,8 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
               AnimatedBuilder(
                 animation: _animController,
                 builder: (context, child) {
-                  final scale = 1.0 + (_animController.value * 0.08);
+                  final dynamicSoundScale = (_soundLevel.clamp(0.0, 10.0) / 10.0) * 0.15;
+                  final scale = 1.0 + (_animController.value * 0.08) + dynamicSoundScale;
                   final outerRadius = 135.0 * scale;
                   final midRadius = 105.0 * scale;
 

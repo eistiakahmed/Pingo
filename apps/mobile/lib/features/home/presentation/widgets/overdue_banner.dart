@@ -30,10 +30,10 @@ class OverdueBanner extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(AppConstants.spacing16),
         decoration: BoxDecoration(
-          color: AppColors.overdue.withOpacity(0.08),
+          color: AppColors.overdue.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
           border: Border.all(
-            color: AppColors.overdue.withOpacity(0.35),
+            color: AppColors.overdue.withValues(alpha: 0.35),
             width: 1,
           ),
         ),
@@ -43,7 +43,7 @@ class OverdueBanner extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppConstants.spacing8),
               decoration: BoxDecoration(
-                color: AppColors.overdue.withOpacity(0.15),
+                color: AppColors.overdue.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -79,7 +79,7 @@ class OverdueBanner extends StatelessWidget {
               TextButton(
                 onPressed: () => onQuickResolve!(firstItem.id),
                 style: TextButton.styleFrom(
-                  backgroundColor: AppColors.overdue.withOpacity(0.12),
+                  backgroundColor: AppColors.overdue.withValues(alpha: 0.12),
                   foregroundColor: AppColors.overdue,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   shape: RoundedRectangleBorder(

@@ -170,7 +170,7 @@ class HomeScreen extends ConsumerWidget {
                               Icon(
                                 Icons.task_alt_rounded,
                                 size: 54,
-                                color: AppColors.success.withOpacity(0.5),
+                                color: AppColors.success.withValues(alpha: 0.5),
                               ),
                               const SizedBox(height: AppConstants.spacing12),
                               Text(

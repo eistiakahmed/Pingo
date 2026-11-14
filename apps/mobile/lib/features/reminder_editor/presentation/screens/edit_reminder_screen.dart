@@ -336,9 +336,9 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
                           color: isSelected ? Colors.white : color,
                         ),
                         selectedColor: color,
-                        backgroundColor: color.withOpacity(0.1),
+                        backgroundColor: color.withValues(alpha: 0.1),
                         side: BorderSide(
-                          color: isSelected ? color : color.withOpacity(0.3),
+                          color: isSelected ? color : color.withValues(alpha: 0.3),
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
@@ -362,7 +362,7 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
               ),
               const SizedBox(height: AppConstants.spacing6),
               DropdownButtonFormField<String?>(
-                value: _selectedRepeat,
+                initialValue: _selectedRepeat,
                 items: _repeatOptions.map((opt) {
                   return DropdownMenuItem<String?>(
                     value: opt,

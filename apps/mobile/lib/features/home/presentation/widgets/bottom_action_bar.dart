@@ -57,7 +57,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, -4),
           ),
@@ -135,7 +135,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
                 borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.brandPrimary.withOpacity(0.35),
+                    color: AppColors.brandPrimary.withValues(alpha: 0.35),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

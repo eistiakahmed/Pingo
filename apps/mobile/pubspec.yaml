@@ -26,6 +26,8 @@ dependencies:
 
   # Utilities
   uuid: ^4.4.0
+  speech_to_text: ^7.5.0
+  permission_handler: ^13.0.2
 
 dev_dependencies:
   flutter_test:

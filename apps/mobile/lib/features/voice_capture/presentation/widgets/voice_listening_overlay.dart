@@ -23,7 +23,7 @@ class VoiceListeningOverlay extends StatefulWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Voice Listening',
-      barrierColor: Colors.black.withOpacity(0.65),
+      barrierColor: Colors.black.withValues(alpha: 0.65),
       transitionDuration: AppConstants.normalAnimation,
       pageBuilder: (ctx, anim1, anim2) => VoiceListeningOverlay(
         onSpeechFinished: onSpeechFinished,
@@ -150,7 +150,7 @@ class _VoiceListeningOverlayState extends State<VoiceListeningOverlay>
                                 decoration: BoxDecoration(
                                   color: index == 3
                                       ? AppColors.brandSecondary
-                                      : Colors.white.withOpacity(0.85),
+                                      : Colors.white.withValues(alpha: 0.85),
                                   borderRadius: BorderRadius.circular(AppConstants.radiusFull),
                                 ),
                               );
@@ -165,9 +165,9 @@ class _VoiceListeningOverlayState extends State<VoiceListeningOverlay>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.12),
+                        color: Colors.white.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-                        border: Border.all(color: Colors.white.withOpacity(0.2)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                       ),
                       child: Column(
                         children: [
@@ -189,7 +189,7 @@ class _VoiceListeningOverlayState extends State<VoiceListeningOverlay>
                           Text(
                             'ভুল হলে ট্যাপ করে টেক্সট এডিট করতে পারবেন',
                             style: AppTypography.bodySmall(
-                              color: Colors.white.withOpacity(0.65),
+                              color: Colors.white.withValues(alpha: 0.65),
                             ),
                           ),
                         ],
@@ -226,7 +226,7 @@ class _VoiceListeningOverlayState extends State<VoiceListeningOverlay>
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.brandPrimary.withOpacity(0.5),
+                                color: AppColors.brandPrimary.withValues(alpha: 0.5),
                                 blurRadius: 24,
                                 spreadRadius: 4,
                               ),
