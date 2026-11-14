@@ -59,5 +59,35 @@ class ReminderItem {
       isOverdue: isOverdue ?? this.isOverdue,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'notes': notes,
+        'dueAt': dueAt.toIso8601String(),
+        'category': category.name,
+        'priority': priority.name,
+        'repeatRule': repeatRule,
+        'isDone': isDone,
+        'isOverdue': isOverdue,
+      };
+
+  factory ReminderItem.fromJson(Map<String, dynamic> json) => ReminderItem(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        notes: json['notes'] as String?,
+        dueAt: DateTime.parse(json['dueAt'] as String),
+        category: ReminderCategory.values.firstWhere(
+          (c) => c.name == json['category'],
+          orElse: () => ReminderCategory.other,
+        ),
+        priority: ReminderPriority.values.firstWhere(
+          (p) => p.name == json['priority'],
+          orElse: () => ReminderPriority.normal,
+        ),
+        repeatRule: json['repeatRule'] as String?,
+        isDone: json['isDone'] as bool? ?? false,
+        isOverdue: json['isOverdue'] as bool? ?? false,
+      );
 }
 

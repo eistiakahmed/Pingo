@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pingo_mobile/core/crypto/crypto_helper.dart';
+import 'package:pingo_mobile/core/network/providers.dart';
 import 'package:pingo_mobile/core/services/notification_service.dart';
+import 'package:pingo_mobile/core/storage/local_storage_service.dart';
 import 'package:pingo_mobile/features/home/data/sync_api_service.dart';
 import 'package:pingo_mobile/features/home/domain/sync_models.dart';
 import '../../domain/reminder_item.dart';
@@ -44,15 +47,73 @@ class HomeReminderState {
   }
 }
 
-/// State notifier managing home reminders with clean, dynamic data and cloud sync.
+/// State notifier managing home reminders with persistent local storage and cloud database sync.
 class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
-  HomeReminderNotifier()
+  final Ref? _ref;
+
+  HomeReminderNotifier([this._ref])
       : super(
           const HomeReminderState(
-            reminders: [], // Zero demo data: Starts pristine and clean
+            reminders: [],
             isLoading: false,
           ),
-        );
+        ) {
+    _initializePersistence();
+  }
+
+  /// Initializes local storage loading and silent background sync with PostgreSQL.
+  Future<void> _initializePersistence() async {
+    try {
+      // 1. Load from local device cache instantly
+      final cached = await LocalStorageService.instance.loadReminders();
+      if (cached.isNotEmpty) {
+        state = state.copyWith(reminders: cached);
+      }
+
+      final ref = _ref;
+      if (ref == null) return;
+
+      // 2. Ensure auth session & sync with cloud PostgreSQL
+      final authApi = ref.read(authApiServiceProvider);
+      final syncApi = ref.read(syncApiServiceProvider);
+      final apiClient = ref.read(apiClientProvider);
+
+      String? token = await LocalStorageService.instance.getAuthToken();
+      if (token == null || token.isEmpty) {
+        final deviceId = await LocalStorageService.instance.getOrCreateDeviceId();
+        final deviceEmail =
+            'device_${deviceId.replaceAll("-", "").substring(0, 12)}@pingo.internal';
+        final devicePass = 'PingoSec_${deviceId.substring(0, 16)}!';
+
+        try {
+          final session =
+              await authApi.register(email: deviceEmail, password: devicePass);
+          token = session.accessToken;
+        } catch (_) {
+          final session =
+              await authApi.login(email: deviceEmail, password: devicePass);
+          token = session.accessToken;
+        }
+        await LocalStorageService.instance.saveAuthToken(token);
+      }
+
+      apiClient.setAuthToken(token);
+
+      // Pull updates from AWS PostgreSQL
+      await pullFromServer(syncApi);
+    } catch (e) {
+      debugPrint('[HomeReminderNotifier] Cloud sync init warning: $e');
+    }
+  }
+
+  void _persistAndSync() {
+    LocalStorageService.instance.saveReminders(state.reminders);
+    final ref = _ref;
+    if (ref != null) {
+      final syncApi = ref.read(syncApiServiceProvider);
+      pushToServer(syncApi);
+    }
+  }
 
   /// Add a newly captured reminder
   void addReminder(ReminderItem item) {
@@ -65,15 +126,18 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
         title: item.title,
         body: 'Scheduled alert from Pingo',
         scheduledDate: item.dueAt,
-        isUrgent: item.category == ReminderCategory.medicine || item.priority == ReminderPriority.important,
+        isUrgent: item.category == ReminderCategory.medicine ||
+            item.priority == ReminderPriority.important,
       );
     }
+    _persistAndSync();
   }
 
   /// Update an existing reminder
   void updateReminder(ReminderItem item) {
     state = state.copyWith(
-      reminders: state.reminders.map((r) => r.id == item.id ? item : r).toList(),
+      reminders:
+          state.reminders.map((r) => r.id == item.id ? item : r).toList(),
     );
     if (!item.isDone) {
       NotificationService.instance.scheduleReminder(
@@ -81,11 +145,13 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
         title: item.title,
         body: 'Scheduled alert from Pingo',
         scheduledDate: item.dueAt,
-        isUrgent: item.category == ReminderCategory.medicine || item.priority == ReminderPriority.important,
+        isUrgent: item.category == ReminderCategory.medicine ||
+            item.priority == ReminderPriority.important,
       );
     } else {
       NotificationService.instance.cancelReminder(item.id.hashCode);
     }
+    _persistAndSync();
   }
 
   /// Snooze reminder by given duration
@@ -108,6 +174,7 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
         return r;
       }).toList(),
     );
+    _persistAndSync();
   }
 
   /// Toggle task completion status
@@ -131,6 +198,7 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
         return r;
       }).toList(),
     );
+    _persistAndSync();
   }
 
   /// Delete a reminder
@@ -139,13 +207,21 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     state = state.copyWith(
       reminders: state.reminders.where((r) => r.id != id).toList(),
     );
+    _persistAndSync();
   }
 
   /// Pushes all local reminders to server with Zero-Knowledge encryption
   Future<bool> pushToServer(SyncApiService syncService) async {
     state = state.copyWith(isSyncing: true, syncError: null);
     try {
-      final dtos = state.reminders.map((r) {
+      final now = DateTime.now();
+      // Apply 14-day retention rule for completed reminders
+      final activeList = state.reminders.where((r) {
+        if (!r.isDone) return true;
+        return now.difference(r.dueAt).inDays < 14;
+      }).toList();
+
+      final dtos = activeList.map((r) {
         return EncryptedReminderDto(
           id: r.id,
           ciphertext: CryptoHelper.toBase64(r.title),
@@ -167,10 +243,13 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
   }
 
   /// Pulls remote delta updates and merges into local list
-  Future<bool> pullFromServer(SyncApiService syncService, {DateTime? since}) async {
+  Future<bool> pullFromServer(SyncApiService syncService,
+      {DateTime? since}) async {
     state = state.copyWith(isSyncing: true, syncError: null);
     try {
       final res = await syncService.pullSync(since: since);
+      final now = DateTime.now();
+
       final remoteReminders = res.reminders.map((dto) {
         String decodedTitle;
         try {
@@ -186,6 +265,10 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
           category: ReminderCategory.other,
           isDone: dto.isCompleted,
         );
+      }).where((r) {
+        // Enforce 14-day completed retention policy
+        if (!r.isDone) return true;
+        return now.difference(r.dueAt).inDays < 14;
       }).toList();
 
       // Merge avoiding duplicate IDs
@@ -194,10 +277,14 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
         currentMap[remote.id] = remote;
       }
 
+      final merged = currentMap.values.toList();
       state = state.copyWith(
-        reminders: currentMap.values.toList(),
+        reminders: merged,
         isSyncing: false,
       );
+
+      // Save merged list locally
+      LocalStorageService.instance.saveReminders(merged);
       return true;
     } catch (e) {
       state = state.copyWith(isSyncing: false, syncError: e.toString());
@@ -208,11 +295,12 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
   /// Clear all reminders
   void clearAll() {
     state = state.copyWith(reminders: []);
+    _persistAndSync();
   }
 }
 
 /// Riverpod provider for Home reminders
 final homeReminderProvider =
     StateNotifierProvider<HomeReminderNotifier, HomeReminderState>((ref) {
-  return HomeReminderNotifier();
+  return HomeReminderNotifier(ref);
 });
