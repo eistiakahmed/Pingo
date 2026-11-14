@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 /// Service managing hardware microphone audio capture and Speech-to-Text conversion.
@@ -19,12 +18,6 @@ class VoiceRecognitionService {
     if (_isInitialized) return true;
 
     try {
-      final status = await Permission.microphone.request();
-      if (!status.isGranted) {
-        debugPrint('[VoiceRecognition] Microphone permission denied');
-        return false;
-      }
-
       _isInitialized = await _speech.initialize(
         onStatus: (status) => debugPrint('[VoiceRecognition] Status: $status'),
         onError: (error) => debugPrint('[VoiceRecognition] Error: $error'),
@@ -90,3 +83,4 @@ class VoiceRecognitionService {
     return _speech.locales();
   }
 }
+
