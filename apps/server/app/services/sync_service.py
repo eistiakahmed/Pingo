@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
+from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,18 @@ from app.schemas.sync import (
     SyncPushRequest,
     SyncPushResponse,
 )
+
+
+def normalize_due_at(dt: Optional[datetime]) -> Optional[datetime]:
+    """Ensures due_at timestamp is strictly in UTC, localizing naive client timestamps from Asia/Dhaka."""
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        try:
+            return dt.replace(tzinfo=ZoneInfo("Asia/Dhaka")).astimezone(timezone.utc)
+        except Exception:
+            return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 class SyncService:
@@ -34,7 +47,7 @@ class SyncService:
                     "auth_tag": r.auth_tag,
                     "key_version": r.key_version,
                     "algorithm": r.algorithm,
-                    "due_at": r.due_at,
+                    "due_at": normalize_due_at(r.due_at),
                     "is_completed": r.is_completed,
                     "version": r.version,
                     "created_at": r.created_at or now,
