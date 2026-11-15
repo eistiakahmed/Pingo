@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pingo_mobile/core/services/voice_recognition_service.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/core/typography/app_typography.dart';
 
-/// Fullscreen Voice Capture screen with live hardware Speech-to-Text audio capture.
+/// Architectural Minimalist Fullscreen Voice Capture screen with hardware Speech-to-Text audio capture.
 class PingoVoiceScreen extends StatefulWidget {
   final Function(String speechText)? onSpeechFinished;
 
@@ -25,7 +26,7 @@ class PingoVoiceScreen extends StatefulWidget {
 
 class _PingoVoiceScreenState extends State<PingoVoiceScreen>
     with SingleTickerProviderStateMixin {
-  String _currentLanguage = 'English + বাংলা';
+  String _currentLanguage = 'বাংলা';
   String _liveSpeechText = '';
   String _accumulatedPrefix = '';
   bool _isListening = false;
@@ -38,7 +39,7 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -133,12 +134,31 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Type your reminder', style: TextStyle(fontWeight: FontWeight.w700)),
+        backgroundColor: AppColors.inkSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.inkBorder, width: 1),
+        ),
+        title: Text(
+          'MANUAL ENTRY',
+          style: AppTypography.monoLabel().copyWith(
+            color: AppColors.paperWhite,
+            letterSpacing: 1.2,
+          ),
+        ),
         content: TextField(
           controller: _typeController,
           autofocus: true,
-          decoration: const InputDecoration(
+          style: const TextStyle(color: AppColors.paperWhite, fontSize: 16),
+          decoration: InputDecoration(
             hintText: 'e.g. Call dentist tomorrow at 10 AM',
+            hintStyle: TextStyle(color: AppColors.paperMuted.withValues(alpha: 0.6)),
+            enabledBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: AppColors.inkBorder),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: AppColors.paperWhite),
+            ),
           ),
           onSubmitted: (val) {
             Navigator.of(ctx).pop();
@@ -148,40 +168,43 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(
+              'CANCEL',
+              style: AppTypography.monoLabel().copyWith(color: AppColors.paperMuted),
+            ),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.pingoPurple),
+          TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               _finishVoice(_typeController.text);
             },
-            child: const Text('Done', style: TextStyle(color: Colors.white)),
+            child: Text(
+              'DONE',
+              style: AppTypography.monoLabel().copyWith(color: AppColors.paperWhite, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _langPill(String label, String langCode, bool isDark) {
+  Widget _langPill(String label, String langCode) {
     final isSelected = _currentLanguage == langCode;
     return GestureDetector(
       onTap: () => _setLanguage(langCode),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          color: isSelected ? AppColors.pingoPurple : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? AppColors.paperWhite : Colors.transparent,
         ),
         child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
+          label.toUpperCase(),
+          style: AppTypography.monoLabel().copyWith(
+            fontSize: 11,
+            color: isSelected ? AppColors.inkBlack : AppColors.paperMuted,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: isSelected
-                ? Colors.white
-                : (isDark ? Colors.white70 : const Color(0xFF4B5563)),
           ),
         ),
       ),
@@ -190,58 +213,47 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBg : AppColors.pingoBackground;
-    final textColor = isDark ? Colors.white : AppColors.pingoDark;
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: AppColors.inkBlack,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             children: [
-              // Top Bar: (X) on left, Language Pill on right
+              // Top Bar: Clean minimal close [X] and segmented language pills
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   InkWell(
                     onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      width: 44,
-                      height: 44,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark ? AppColors.darkBorder : const Color(0xFFE5E7EB),
-                          width: 1.2,
-                        ),
-                        color: isDark ? AppColors.darkSurface : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.inkBorder, width: 1),
+                        color: AppColors.inkSurface,
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.close_rounded,
-                        size: 20,
-                        color: isDark ? Colors.white70 : const Color(0xFF374151),
+                        size: 18,
+                        color: AppColors.paperWhite,
                       ),
                     ),
                   ),
-                  // Segmented Bilingual Pill (বাংলা | English)
                   Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: isDark ? AppColors.darkBorder : const Color(0xFFE5E7EB),
-                        width: 1.2,
-                      ),
-                      color: isDark ? AppColors.darkSurface : Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: AppColors.inkBorder, width: 1),
+                      color: AppColors.inkSurface,
                     ),
                     padding: const EdgeInsets.all(3),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _langPill('বাংলা', 'বাংলা', isDark),
-                        _langPill('English', 'English', isDark),
+                        _langPill('বাংলা', 'বাংলা'),
+                        _langPill('English', 'English'),
                       ],
                     ),
                   ),
@@ -250,74 +262,96 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
 
               const Spacer(flex: 2),
 
-              // Status & Realtime Transcribed Text
-              Text(
-                _isListening
-                    ? (_currentLanguage == 'বাংলা' ? 'শুনছি...' : 'Listening...')
-                    : (_currentLanguage == 'বাংলা' ? 'বলার জন্য ট্যাপ করুন' : 'Tap to speak'),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.pingoPurple,
-                ),
+              // Status Indicator (Monospace Label)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _isListening ? const Color(0xFF10B981) : AppColors.paperMuted,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isListening
+                        ? (_currentLanguage == 'বাংলা' ? 'শুনছি · RECORDING' : 'LISTENING · ACTIVE')
+                        : (_currentLanguage == 'বাংলা' ? 'বিরতি · PAUSED' : 'TAP TO RESUME'),
+                    style: AppTypography.monoLabel().copyWith(
+                      color: _isListening ? AppColors.paperWhite : AppColors.paperMuted,
+                      letterSpacing: 1.2,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
 
-              // Clean text state: Displays live speech or calm prompt
-              Text(
-                _liveSpeechText.isNotEmpty
-                    ? _liveSpeechText
-                    : (_currentLanguage == 'বাংলা'
-                        ? 'আপনার রিমাইন্ডারটি বাংলায় বলুন...'
-                        : 'What should I remember for you?'),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  height: 1.3,
-                  color: _liveSpeechText.isNotEmpty
-                      ? textColor
-                      : (isDark ? Colors.white60 : const Color(0xFF9CA3AF)),
-                  letterSpacing: -0.4,
+              // Transcribed Text Display (High typographic contrast)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  _liveSpeechText.isNotEmpty
+                      ? _liveSpeechText
+                      : (_currentLanguage == 'বাংলা'
+                          ? 'আপনার রিমাইন্ডারটি স্পষ্ট করে বলুন...'
+                          : 'Speak your reminder clearly...'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: AppTypography.displayFont,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                    color: _liveSpeechText.isNotEmpty
+                        ? AppColors.paperWhite
+                        : AppColors.paperMuted.withValues(alpha: 0.5),
+                    letterSpacing: -0.5,
+                  ),
                 ),
               ),
 
               const Spacer(flex: 3),
 
-              // Central Ripple Orb with Audio Waves
+              // Center Minimal Visualizer: Concentric hairline rings & central graphite capsule
               AnimatedBuilder(
                 animation: _animController,
                 builder: (context, child) {
-                  final dynamicSoundScale = (_soundLevel.clamp(0.0, 10.0) / 10.0) * 0.15;
-                  final scale = 1.0 + (_animController.value * 0.08) + dynamicSoundScale;
-                  final outerRadius = 135.0 * scale;
-                  final midRadius = 105.0 * scale;
+                  final soundScale = (_soundLevel.clamp(0.0, 10.0) / 10.0) * 0.25;
+                  final pulse = _isListening ? (1.0 + (_animController.value * 0.08) + soundScale) : 1.0;
 
                   return SizedBox(
-                    width: 270,
-                    height: 270,
+                    width: 240,
+                    height: 240,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Outer subtle ring
+                        // Outer hairline ring
                         Container(
-                          width: outerRadius * 2,
-                          height: outerRadius * 2,
+                          width: 220 * pulse,
+                          height: 220 * pulse,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: AppColors.pingoPurple.withValues(alpha: 0.06),
+                            border: Border.all(
+                              color: AppColors.inkBorder.withValues(alpha: _isListening ? 0.8 : 0.3),
+                              width: 1,
+                            ),
                           ),
                         ),
-                        // Mid ring
+                        // Middle hairline ring
                         Container(
-                          width: midRadius * 2,
-                          height: midRadius * 2,
+                          width: 170 * pulse,
+                          height: 170 * pulse,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: AppColors.pingoPurple.withValues(alpha: 0.12),
+                            border: Border.all(
+                              color: AppColors.inkBorder.withValues(alpha: _isListening ? 0.9 : 0.4),
+                              width: 1,
+                            ),
                           ),
                         ),
-                        // Core solid button with soundwaves / Tap to Pause or Resume
+                        // Center Core: Ink Surface with hairline white border
                         GestureDetector(
                           onTap: () {
                             if (_isListening) {
@@ -327,34 +361,28 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
                             }
                           },
                           child: Container(
-                            width: 140,
-                            height: 140,
+                            width: 110,
+                            height: 110,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: _isListening
-                                  ? const LinearGradient(
-                                      colors: [
-                                        AppColors.penguinBeak,
-                                        AppColors.penguinOrange,
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    )
-                                  : null,
-                              color: _isListening ? null : const Color(0xFF6B7280),
+                              color: AppColors.inkCard,
+                              border: Border.all(
+                                color: _isListening ? AppColors.paperWhite : AppColors.inkBorder,
+                                width: 1.5,
+                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: (_isListening ? AppColors.penguinBeak : const Color(0xFF6B7280)).withValues(alpha: 0.35),
-                                  blurRadius: 28,
-                                  offset: const Offset(0, 10),
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
                                 ),
                               ],
                             ),
                             child: Center(
                               child: Icon(
-                                _isListening ? Icons.graphic_eq_rounded : Icons.mic_rounded,
-                                color: Colors.white,
-                                size: 58,
+                                _isListening ? Icons.graphic_eq_rounded : Icons.mic_none_rounded,
+                                color: _isListening ? AppColors.paperWhite : AppColors.paperMuted,
+                                size: 44,
                               ),
                             ),
                           ),
@@ -367,98 +395,85 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
 
               const Spacer(flex: 2),
 
-              // Caption
+              // Architectural Guidance Note
               Text(
                 _currentLanguage == 'বাংলা'
-                    ? 'স্বাভাবিকভাবে বলুন, কথা থামালে সেভ হয়ে যাবে।'
-                    : 'Speak naturally. I will save it when you stop.',
-                style: TextStyle(
-                  fontSize: 14.5,
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted,
+                    ? 'কথা শেষ হলে স্বয়ংক্রিয়ভাবে সেভ হবে'
+                    : 'AUTOMATIC COMMIT ON SILENCE',
+                style: AppTypography.monoLabel().copyWith(
+                  fontSize: 11,
+                  color: AppColors.paperMuted,
+                  letterSpacing: 1.0,
                 ),
               ),
 
               const Spacer(flex: 2),
 
-              // Bottom Action Controls: Cancel | Stop | Type
+              // Bottom Precision Dock: [ CANCEL ] · [ STOP/SAVE ] · [ TYPE ]
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Cancel Button
+                  // Cancel
                   InkWell(
                     onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: isDark ? AppColors.darkBorder : const Color(0xFFE5E7EB),
-                          width: 1.2,
-                        ),
-                        color: isDark ? AppColors.darkSurface : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.inkBorder, width: 1),
+                        color: AppColors.inkSurface,
                       ),
                       child: Text(
-                        _currentLanguage == 'বাংলা' ? 'বাতিল' : 'Cancel',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: textColor,
+                        'DISCARD',
+                        style: AppTypography.monoLabel().copyWith(
+                          fontSize: 12,
+                          color: AppColors.paperMuted,
                         ),
                       ),
                     ),
                   ),
 
-                  // Stop & Save (Red circle with white square)
+                  // Stop & Save: Crisp high-contrast square in circular container
                   GestureDetector(
                     onTap: () => _finishVoice(),
                     child: Container(
-                      width: 68,
-                      height: 68,
+                      width: 58,
+                      height: 58,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFFEF4444),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFEF4444).withValues(alpha: 0.35),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
+                        color: AppColors.paperWhite,
+                        border: Border.all(color: AppColors.paperWhite, width: 1),
                       ),
                       child: Center(
                         child: Container(
-                          width: 22,
-                          height: 22,
+                          width: 18,
+                          height: 18,
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(4),
+                            color: AppColors.inkBlack,
+                            borderRadius: BorderRadius.circular(3),
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  // Type Button
+                  // Manual Type
                   InkWell(
                     onTap: _openTypeDialog,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: isDark ? AppColors.darkBorder : const Color(0xFFE5E7EB),
-                          width: 1.2,
-                        ),
-                        color: isDark ? AppColors.darkSurface : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.inkBorder, width: 1),
+                        color: AppColors.inkSurface,
                       ),
                       child: Text(
-                        _currentLanguage == 'বাংলা' ? 'লিখুন' : 'Type',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: textColor,
+                        'KEYBOARD',
+                        style: AppTypography.monoLabel().copyWith(
+                          fontSize: 12,
+                          color: AppColors.paperWhite,
                         ),
                       ),
                     ),
@@ -466,7 +481,7 @@ class _PingoVoiceScreenState extends State<PingoVoiceScreen>
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
             ],
           ),
         ),

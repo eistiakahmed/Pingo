@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Typography configuration tailored for bilingual (Bangla + English) text.
-/// Uses [Hind Siliguri] with a deliberate line-height factor (1.45x-1.55x)
-/// to prevent clipping of Bangla diacritics and conjuncts (যুক্তাক্ষর).
+/// Architectural Minimalist Typography configuration tailored for bilingual (Bangla + English) text.
+/// Uses [Hind Siliguri] for clean, legible Bengali typography with deliberate line heights (1.45x-1.55x),
+/// and [Space Grotesk] / [JetBrains Mono] for sharp, editorial metadata.
 class AppTypography {
   AppTypography._();
 
@@ -15,6 +15,39 @@ class AppTypography {
         height: banglaLineHeight,
         letterSpacing: 0.1,
       );
+
+  static String get displayFont => GoogleFonts.spaceGrotesk().fontFamily ?? 'Space Grotesk';
+  static String get monoFont => GoogleFonts.jetBrainsMono().fontFamily ?? 'JetBrains Mono';
+
+  // Editorial Masthead & Monospace Labels
+  static TextStyle masthead({
+    Color? color,
+    double fontSize = 24,
+    FontWeight fontWeight = FontWeight.w800,
+    double letterSpacing = 2.0,
+  }) =>
+      GoogleFonts.spaceGrotesk(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        letterSpacing: letterSpacing,
+        color: color,
+      );
+
+  static TextStyle monoLabel({
+    Color? color,
+    double fontSize = 11,
+    FontWeight fontWeight = FontWeight.w600,
+    double letterSpacing = 0.8,
+  }) =>
+      GoogleFonts.jetBrainsMono(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        letterSpacing: letterSpacing,
+        color: color,
+      );
+
+  static TextStyle get mastheadStyle => masthead();
+  static TextStyle get monoLabelStyle => monoLabel();
 
   // Headlines
   static TextStyle headlineLarge({Color? color}) => _baseBanglaStyle.copyWith(
@@ -87,4 +120,3 @@ class AppTypography {
         color: color,
       );
 }
-

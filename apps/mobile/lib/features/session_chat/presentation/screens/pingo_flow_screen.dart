@@ -6,6 +6,7 @@ import 'package:pingo_mobile/core/network/providers.dart';
 import 'package:pingo_mobile/core/services/fcm_service.dart';
 import 'package:pingo_mobile/core/services/notification_service.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/core/typography/app_typography.dart';
 import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
 import 'package:pingo_mobile/features/home/presentation/state/home_reminder_provider.dart';
 import 'package:pingo_mobile/features/voice_capture/presentation/screens/pingo_voice_screen.dart';
@@ -52,7 +53,6 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   late String _taskTime;
   bool _hasFollowUpUpdate = false;
   String _followUpTime = '6:00 PM';
-  final String _reminderAlert = 'At time of event';
   bool _hasSavedInitial = false;
   bool _isLoadingAi = false;
   String? _lastCreatedReminderId;
@@ -750,69 +750,94 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBg : AppColors.pingoBackground;
-    final cardBg = isDark ? AppColors.darkSurface : AppColors.pingoSurface;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.pingoBorder;
-    final textColor = isDark ? Colors.white : AppColors.pingoDark;
-    final mutedColor =
-        isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted;
-
-    String hintText = 'Reply to Pingo...';
+    String hintText = 'Reply or enter instruction...';
     if (_activeScenario == FlowScenario.askAboutToday) {
-      hintText = 'Ask about tomorrow, next week, or add...';
+      hintText = 'Ask about tomorrow or add new task...';
     } else if (_activeScenario == FlowScenario.askQuestion) {
-      hintText = 'Or say the time';
+      hintText = 'Enter time (e.g. 10:30 AM)...';
     }
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: AppColors.inkBlack,
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar
+            // Top Bar: Architectural Minimalist Masthead
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: textColor,
-                      size: 20,
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.inkBorder, width: 1),
+                        color: AppColors.inkSurface,
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: AppColors.paperWhite,
+                        size: 18,
+                      ),
                     ),
-                    onPressed: () => Navigator.of(context).pop(),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Pingo',
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PINGO',
+                        style: AppTypography.masthead().copyWith(
+                          fontSize: 16,
+                          letterSpacing: 2.0,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF10B981),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'SESSION // ACTIVE',
+                            style: AppTypography.monoLabel().copyWith(
+                              fontSize: 10,
+                              color: AppColors.paperMuted,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
 
+            const Divider(color: AppColors.inkBorder, height: 1),
+
             // Conversation Stream
             Expanded(
               child: ListView(
                 controller: _scrollController,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 children: [
                   if (_activeScenario == FlowScenario.autoSaved) ...[
-                    _buildAutoSavedContent(
-                        isDark, cardBg, borderColor, textColor, mutedColor),
-                  ] else if (_activeScenario ==
-                      FlowScenario.askAboutToday) ...[
-                    _buildAskAboutTodayContent(
-                        isDark, cardBg, borderColor, textColor, mutedColor),
+                    _buildAutoSavedContent(),
+                  ] else if (_activeScenario == FlowScenario.askAboutToday) ...[
+                    _buildAskAboutTodayContent(),
                   ] else if (_activeScenario == FlowScenario.askQuestion) ...[
-                    _buildAskQuestionContent(
-                        isDark, cardBg, borderColor, textColor, mutedColor),
+                    _buildAskQuestionContent(),
                   ],
 
                   // Follow up messages stream
@@ -826,33 +851,35 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: borderColor, width: 1.2),
+                          color: AppColors.inkSurface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.inkBorder, width: 1),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (msg['isLoading'] == true) ...[
-                              const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppColors.penguinBeak),
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2, right: 10),
+                                child: SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.paperWhite),
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 10),
                             ],
                             Flexible(
                               child: Text(
                                 msg['text'] as String,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: textColor,
-                                  height: 1.4,
-                                  fontWeight: FontWeight.w500,
+                                style: const TextStyle(
+                                  fontSize: 14.5,
+                                  color: AppColors.paperWhite,
+                                  height: 1.45,
+                                  fontWeight: FontWeight.w400,
                                 ),
                               ),
                             ),
@@ -867,9 +894,8 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
 
             // Bottom Input Dock
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
-              child: _buildBottomInputDock(
-                  isDark, cardBg, borderColor, textColor, hintText),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: _buildBottomInputDock(hintText),
             ),
           ],
         ),
@@ -878,13 +904,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   }
 
   // --- 1. Scenario: Auto Saved (Dynamic based on user prompt) ---
-  Widget _buildAutoSavedContent(
-    bool isDark,
-    Color cardBg,
-    Color borderColor,
-    Color textColor,
-    Color mutedColor,
-  ) {
+  Widget _buildAutoSavedContent() {
     if (_isLoadingAi) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -894,30 +914,28 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           _botHeader(),
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: borderColor, width: 1.2),
+              color: AppColors.inkSurface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.inkBorder, width: 1),
             ),
             child: Row(
               children: [
                 const SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 14,
+                  height: 14,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(AppColors.penguinBeak),
+                    strokeWidth: 1.8,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.paperWhite),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Text(
-                  'Pingo is remembering...',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
+                  'PROCESSING TEMPORAL INTENT...',
+                  style: AppTypography.monoLabel().copyWith(
+                    color: AppColors.paperWhite,
+                    letterSpacing: 1.2,
                   ),
                 ),
               ],
@@ -936,61 +954,128 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         _botHeader(),
         const SizedBox(height: 8),
 
-        // Auto Saved Card
+        // Auto Saved Card (Architectural Left-Bordered Block)
         Container(
-          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: borderColor, width: 1.2),
+            color: AppColors.inkSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.inkBorder, width: 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: const [
-                  Icon(Icons.check_circle, color: AppColors.success, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Saved automatically',
-                    style: TextStyle(
-                      color: Color(0xFF047857),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+              // Header tag
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: AppColors.inkBorder, width: 1)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFF10B981),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'COMMITTED TO AGENDA',
+                          style: AppTypography.monoLabel().copyWith(
+                            color: const Color(0xFF10B981),
+                            fontSize: 10.5,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _taskTitle,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: textColor,
-                  letterSpacing: -0.3,
+                    Text(
+                      'EXACT ALARM',
+                      style: AppTypography.monoLabel().copyWith(
+                        color: AppColors.paperMuted,
+                        fontSize: 10.5,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(Icons.calendar_today_outlined,
-                      size: 16, color: mutedColor),
-                  const SizedBox(width: 6),
-                  Text(_taskDate,
+
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _taskTitle,
                       style: TextStyle(
-                          fontSize: 14,
-                          color: textColor,
-                          fontWeight: FontWeight.w500)),
-                  const SizedBox(width: 14),
-                  Icon(Icons.access_time_rounded, size: 16, color: mutedColor),
-                  const SizedBox(width: 6),
-                  Text(_taskTime,
-                      style: TextStyle(
-                          fontSize: 14,
-                          color: textColor,
-                          fontWeight: FontWeight.w500)),
-                ],
+                        fontFamily: AppTypography.displayFont,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.paperWhite,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Clean Tabular Metadata
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'SCHEDULED DATE',
+                                style: AppTypography.monoLabel().copyWith(
+                                  color: AppColors.paperMuted,
+                                  fontSize: 10,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _taskDate.toUpperCase(),
+                                style: AppTypography.monoLabel().copyWith(
+                                  color: AppColors.paperWhite,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'EXECUTION TIME',
+                                style: AppTypography.monoLabel().copyWith(
+                                  color: AppColors.paperMuted,
+                                  fontSize: 10,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _taskTime.toUpperCase(),
+                                style: AppTypography.monoLabel().copyWith(
+                                  color: AppColors.paperWhite,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -998,7 +1083,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
 
         // Follow up Update (if user made adjustments)
         if (_hasFollowUpUpdate) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           _userBubble('Updated reminder time: $_followUpTime'),
           const SizedBox(height: 14),
           _botHeader(),
@@ -1006,24 +1091,30 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: borderColor, width: 1.2),
+              color: AppColors.inkSurface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.inkBorder, width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  children: const [
-                    Icon(Icons.check_circle,
-                        color: AppColors.success, size: 20),
-                    SizedBox(width: 8),
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF10B981),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Text(
-                      'Time updated',
-                      style: TextStyle(
-                        color: Color(0xFF047857),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                      'SCHEDULE RECONFIGURED',
+                      style: AppTypography.monoLabel().copyWith(
+                        color: const Color(0xFF10B981),
+                        fontSize: 10.5,
+                        letterSpacing: 1.0,
                       ),
                     ),
                   ],
@@ -1032,67 +1123,32 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                 Text(
                   _taskTitle,
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: textColor,
-                    letterSpacing: -0.3,
+                    fontFamily: AppTypography.displayFont,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.paperWhite,
                   ),
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today_outlined,
-                        size: 16, color: mutedColor),
-                    const SizedBox(width: 6),
-                    Text(_taskDate,
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: textColor,
-                            fontWeight: FontWeight.w500)),
-                    const SizedBox(width: 14),
-                    Icon(Icons.access_time_rounded,
-                        size: 16, color: mutedColor),
-                    const SizedBox(width: 6),
-                    Text(_followUpTime,
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: textColor,
-                            fontWeight: FontWeight.w500)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Divider(color: borderColor, height: 1),
                 const SizedBox(height: 14),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Alert',
-                      style: TextStyle(fontSize: 14, color: mutedColor),
-                    ),
-                    Text(
-                      _reminderAlert,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: textColor,
-                      ),
-                    ),
+                    Text('NEW TIME: ', style: AppTypography.monoLabel().copyWith(color: AppColors.paperMuted, fontSize: 11)),
+                    Text(_followUpTime, style: AppTypography.monoLabel().copyWith(color: AppColors.paperWhite, fontSize: 13, fontWeight: FontWeight.bold)),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 InkWell(
                   onTap: () {
                     setState(() {
                       _hasFollowUpUpdate = false;
                     });
                   },
-                  child: const Text(
-                    'Undo this change',
-                    style: TextStyle(
-                      color: AppColors.penguinBeak,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                  child: Text(
+                    '[ REVERT CHANGE ]',
+                    style: AppTypography.monoLabel().copyWith(
+                      color: AppColors.paperMuted,
+                      fontSize: 11,
+                      letterSpacing: 1.0,
                     ),
                   ),
                 ),
@@ -1101,26 +1157,26 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           ),
         ],
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
         // Contextual action chips
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            _chip('Repeat weekly', cardBg, borderColor, textColor, () {
+            _chip('REPEAT WEEKLY', () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Set to repeat weekly')),
               );
             }),
-            _chip('Move to tomorrow', cardBg, borderColor, textColor, () {
+            _chip('MOVE TO TOMORROW', () {
               setState(() => _taskDate = 'Tomorrow');
               _handleSend('Move to tomorrow');
             }),
-            _chip('Test alert', cardBg, borderColor, textColor, () {
+            _chip('TEST ALERT', () {
               _handleSend('test alert');
             }),
-            _chip('Cancel reminder', cardBg, borderColor, textColor, () {
+            _chip('CANCEL REMINDER', () {
               _handleSend('Cancel this reminder');
             }),
           ],
@@ -1129,14 +1185,8 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
     );
   }
 
-  // --- 2. Scenario: Ask About Today / Tomorrow (Zero fake items) ---
-  Widget _buildAskAboutTodayContent(
-    bool isDark,
-    Color cardBg,
-    Color borderColor,
-    Color textColor,
-    Color mutedColor,
-  ) {
+  // --- 2. Scenario: Ask About Today / Tomorrow ---
+  Widget _buildAskAboutTodayContent() {
     final promptLower = widget.initialPrompt.toLowerCase();
     final isTomorrow = promptLower.contains('tomorrow') ||
         promptLower.contains('কাল') ||
@@ -1168,50 +1218,51 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         const SizedBox(height: 8),
 
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: borderColor, width: 1.2),
+            color: AppColors.inkSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.inkBorder, width: 1),
           ),
           child: matchingTasks.isEmpty
-              ? Column(
-                  children: [
-                    const Icon(Icons.check_circle_outline_rounded,
-                        color: AppColors.success, size: 36),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No tasks left for $targetName!',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: textColor,
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: Column(
+                    children: [
+                      Text(
+                        'ZERO SCHEDULED ITEMS',
+                        style: AppTypography.monoLabel().copyWith(
+                          fontSize: 12,
+                          color: AppColors.paperWhite,
+                          letterSpacing: 1.2,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'You are all caught up. Say or type below to create a new reminder.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: mutedColor,
+                      const SizedBox(height: 6),
+                      Text(
+                        'Agenda is completely clear for $targetName.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.paperMuted,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'You have ${matchingTasks.where((t) => !t.isDone).length} things scheduled for $targetName.',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: textColor,
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'AGENDA // ${matchingTasks.length} COMMITMENT${matchingTasks.length == 1 ? '' : 'S'}',
+                        style: AppTypography.monoLabel().copyWith(
+                          fontSize: 11,
+                          color: AppColors.paperMuted,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Divider(color: borderColor, height: 1),
+                    const Divider(color: AppColors.inkBorder, height: 1),
                     ...matchingTasks.map((task) => _checklistItem(
                           title: task.title,
                           time: DateFormat.jm().format(task.dueAt),
@@ -1221,32 +1272,29 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                                 .read(homeReminderProvider.notifier)
                                 .toggleDone(task.id);
                           },
-                          textColor: textColor,
-                          mutedColor: mutedColor,
-                          borderColor: borderColor,
                         )),
                   ],
                 ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             if (!isTomorrow)
-              _chip('What about tomorrow?', cardBg, borderColor, textColor, () {
+              _chip('WHAT ABOUT TOMORROW?', () {
                 _handleSend('What do I have tomorrow?');
               }),
             if (isTomorrow)
-              _chip('What about today?', cardBg, borderColor, textColor, () {
+              _chip('WHAT ABOUT TODAY?', () {
                 _handleSend('What do I have today?');
               }),
-            _chip('Test alert', cardBg, borderColor, textColor, () {
+            _chip('TEST ALERT', () {
               _handleSend('test alert');
             }),
-            _chip('Show all tasks', cardBg, borderColor, textColor, () {
+            _chip('SHOW ALL TASKS', () {
               _handleSend('Show all tasks');
             }),
           ],
@@ -1256,13 +1304,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   }
 
   // --- 3. Scenario: Ask Question (Clarification for user prompt) ---
-  Widget _buildAskQuestionContent(
-    bool isDark,
-    Color cardBg,
-    Color borderColor,
-    Color textColor,
-    Color mutedColor,
-  ) {
+  Widget _buildAskQuestionContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1277,38 +1319,39 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: borderColor, width: 1.2),
+            color: AppColors.inkSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.inkBorder, width: 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Not saved yet',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFFD97706),
+              Text(
+                'SPECIFY DUE TIME',
+                style: AppTypography.monoLabel().copyWith(
+                  fontSize: 10.5,
+                  color: AppColors.paperMuted,
+                  letterSpacing: 1.2,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'What time should I remind you?',
+                'When should this alert fire?',
                 style: TextStyle(
-                  fontSize: 19,
+                  fontFamily: AppTypography.displayFont,
+                  fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: textColor,
+                  color: AppColors.paperWhite,
                   letterSpacing: -0.3,
                 ),
               ),
               const SizedBox(height: 16),
 
-              _timeOptionPill('Morning, 9:00 AM', textColor, borderColor),
-              const SizedBox(height: 10),
-              _timeOptionPill('Afternoon, 2:00 PM', textColor, borderColor),
-              const SizedBox(height: 10),
-              _timeOptionPill('Evening, 6:00 PM', textColor, borderColor),
+              _timeOptionPill('09:00 AM · MORNING'),
+              const SizedBox(height: 8),
+              _timeOptionPill('02:00 PM · AFTERNOON'),
+              const SizedBox(height: 8),
+              _timeOptionPill('06:00 PM · EVENING'),
 
               const SizedBox(height: 14),
               InkWell(
@@ -1322,12 +1365,12 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                     _saveQuestionTime(formatted);
                   }
                 },
-                child: const Text(
-                  'Pick another time',
-                  style: TextStyle(
-                    color: AppColors.penguinBeak,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                child: Text(
+                  '[ SELECT CUSTOM TIME ]',
+                  style: AppTypography.monoLabel().copyWith(
+                    color: AppColors.paperWhite,
+                    fontSize: 11,
+                    letterSpacing: 1.0,
                   ),
                 ),
               ),
@@ -1336,7 +1379,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         ),
 
         if (_selectedTime != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           _userBubble(_selectedTime!),
           const SizedBox(height: 14),
           _botHeader(),
@@ -1344,21 +1387,26 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: borderColor, width: 1.2),
+              color: AppColors.inkSurface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.inkBorder, width: 1),
             ),
             child: Row(
               children: [
-                const Icon(Icons.check_circle,
-                    color: AppColors.success, size: 20),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Text(
-                  'Saved! Reminding you at $_selectedTime',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
+                  'CONFIRMED // REMINDING AT $_selectedTime',
+                  style: AppTypography.monoLabel().copyWith(
+                    color: AppColors.paperWhite,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -1374,32 +1422,19 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 320),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        constraints: const BoxConstraints(maxWidth: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [
-              AppColors.penguinBeak,
-              AppColors.penguinOrange,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.penguinBeak.withValues(alpha: 0.30),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppColors.inkCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.inkBorder, width: 1),
         ),
         child: Text(
           text,
           style: const TextStyle(
-            color: Colors.white,
-            fontSize: 15.5,
-            fontWeight: FontWeight.w600,
+            color: AppColors.paperWhite,
+            fontSize: 14.5,
+            fontWeight: FontWeight.w400,
           ),
         ),
       ),
@@ -1407,38 +1442,23 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
   }
 
   Widget _botHeader() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: AppColors.penguinOrange.withValues(alpha: 0.16),
+          width: 6,
+          height: 6,
+          decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.penguinOrange.withValues(alpha: 0.35),
-              width: 1.2,
-            ),
-          ),
-          child: const Center(
-            child: Text(
-              'P',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: AppColors.penguinOrange,
-              ),
-            ),
+            color: Color(0xFF10B981),
           ),
         ),
         const SizedBox(width: 8),
         Text(
-          'Pingo',
-          style: TextStyle(
-            fontSize: 14.5,
-            fontWeight: FontWeight.w700,
-            color: isDark ? AppColors.penguinSnow : AppColors.pingoDark,
+          'PINGO ENGINE',
+          style: AppTypography.monoLabel().copyWith(
+            fontSize: 10.5,
+            color: AppColors.paperMuted,
+            letterSpacing: 1.2,
           ),
         ),
       ],
@@ -1450,67 +1470,48 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
     required String time,
     required bool isCompleted,
     required VoidCallback onToggle,
-    required Color textColor,
-    required Color mutedColor,
-    required Color borderColor,
   }) {
     return InkWell(
       onTap: onToggle,
-      borderRadius: BorderRadius.circular(16),
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: isCompleted
-              ? Colors.transparent
-              : AppColors.penguinBeak.withValues(alpha: 0.04),
-          border: Border.all(
-            color: isCompleted ? borderColor.withValues(alpha: 0.5) : borderColor,
-            width: 1,
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.inkBorder, width: 1)),
         ),
         child: Row(
           children: [
-            isCompleted
-                ? const Icon(Icons.check_circle_rounded,
-                    color: AppColors.success, size: 22)
-                : Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.penguinBeak,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-            const SizedBox(width: 12),
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isCompleted ? const Color(0xFF10B981) : AppColors.inkBorder,
+                  width: 1.5,
+                ),
+                color: isCompleted ? const Color(0xFF10B981) : Colors.transparent,
+              ),
+              child: isCompleted
+                  ? const Icon(Icons.check, size: 12, color: AppColors.inkBlack)
+                  : null,
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: isCompleted ? mutedColor : textColor,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w500,
+                  color: isCompleted ? AppColors.paperMuted : AppColors.paperWhite,
                   decoration: isCompleted ? TextDecoration.lineThrough : null,
                 ),
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: AppColors.penguinGlacier.withValues(alpha: 0.12),
-              ),
-              child: Text(
-                time,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.penguinGlacier,
-                ),
+            Text(
+              time,
+              style: AppTypography.monoLabel().copyWith(
+                fontSize: 11,
+                color: AppColors.paperMuted,
               ),
             ),
           ],
@@ -1519,119 +1520,119 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
     );
   }
 
-  Widget _timeOptionPill(String timeText, Color textColor, Color borderColor) {
+  Widget _timeOptionPill(String timeText) {
     final isSelected = _selectedTime == timeText;
     return InkWell(
       onTap: () {
         _saveQuestionTime(timeText);
       },
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? AppColors.penguinBeak : borderColor,
-            width: isSelected ? 2 : 1.2,
+            color: isSelected ? AppColors.paperWhite : AppColors.inkBorder,
+            width: 1,
           ),
-          color: isSelected
-              ? AppColors.penguinBeak.withValues(alpha: 0.12)
-              : Colors.transparent,
+          color: isSelected ? AppColors.inkCard : AppColors.inkSurface,
         ),
         child: Text(
           timeText,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? AppColors.penguinBeak : textColor,
+          style: AppTypography.monoLabel().copyWith(
+            fontSize: 12,
+            color: isSelected ? AppColors.paperWhite : AppColors.paperMuted,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ),
     );
   }
 
-  Widget _chip(String label, Color bg, Color border, Color textColor, VoidCallback onTap) {
+  Widget _chip(String label, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: border, width: 1.2),
-          color: bg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.inkBorder, width: 1),
+          color: AppColors.inkSurface,
         ),
         child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w600,
-            color: textColor,
+          '[ $label ]',
+          style: AppTypography.monoLabel().copyWith(
+            fontSize: 10.5,
+            color: AppColors.paperWhite,
+            letterSpacing: 0.8,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildBottomInputDock(
-    bool isDark,
-    Color cardBg,
-    Color borderColor,
-    Color textColor,
-    String hintText,
-  ) {
+  Widget _buildBottomInputDock(String hintText) {
     return Container(
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: borderColor, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.inkSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.inkBorder, width: 1),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _inputController,
               onSubmitted: _handleSend,
-              style: TextStyle(color: textColor, fontSize: 15),
+              style: const TextStyle(color: AppColors.paperWhite, fontSize: 14),
               decoration: InputDecoration(
                 hintText: hintText,
-                hintStyle:
-                    const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14.5),
+                hintStyle: TextStyle(
+                  color: AppColors.paperMuted.withValues(alpha: 0.6),
+                  fontSize: 13,
+                ),
                 border: InputBorder.none,
               ),
             ),
           ),
-          GestureDetector(
+          InkWell(
             onTap: () {
               PingoVoiceScreen.show(context, onSpeechFinished: (speech) {
                 _handleSend(speech);
               });
             },
+            borderRadius: BorderRadius.circular(8),
             child: Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.penguinBeak,
-                    AppColors.penguinOrange,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: AppColors.inkCard,
+                border: Border.all(color: AppColors.inkBorder, width: 1),
               ),
-              child: const Center(
-                child: Icon(Icons.mic_rounded, color: Colors.white, size: 22),
+              child: const Icon(
+                Icons.mic_none_rounded,
+                color: AppColors.paperWhite,
+                size: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: () => _handleSend(_inputController.text),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: AppColors.paperWhite,
+              ),
+              child: const Icon(
+                Icons.arrow_upward_rounded,
+                color: AppColors.inkBlack,
+                size: 18,
               ),
             ),
           ),

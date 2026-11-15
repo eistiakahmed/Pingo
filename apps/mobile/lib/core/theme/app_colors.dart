@@ -1,70 +1,82 @@
 import 'package:flutter/material.dart';
 
-/// Semantic color palette for Pingo based on the Penguin Design System.
-/// Combines deep tuxedo midnight navy, antarctic glacier snow, and signature golden amber beak accents.
+/// Semantic color palette for Pingo based on the Architectural Minimalist Design System.
+/// Monochromatic ink & paper aesthetic with titanium highlights and hairline borders.
 class AppColors {
   AppColors._();
 
-  // 🐧 Pingo Penguin Signature Tokens
-  static const Color penguinBlack = Color(0xFF0B0F19);        // Deep Tuxedo Midnight Navy
-  static const Color penguinSurface = Color(0xFF141C2B);      // Elevated Smooth Slate
-  static const Color penguinCard = Color(0xFF1D283C);         // Floating Frost Container
-  static const Color penguinBorder = Color(0xFF283852);       // Crisp Icy Border
-  static const Color penguinBeak = Color(0xFFFF9F1C);         // Signature Golden Amber Beak
-  static const Color penguinOrange = Color(0xFFFF7A00);       // Warm Tangerine Accent
-  static const Color penguinGlacier = Color(0xFF0EA5E9);      // Arctic Glacier Ocean Blue
-  static const Color penguinSnow = Color(0xFFFFFFFF);         // Pure Antarctic Snow White
-  static const Color penguinFrost = Color(0xFFF1F5F9);        // Frost White Text
-  static const Color penguinMuted = Color(0xFF94A3B8);        // Accessible Muted Text (4.5:1+)
-  static const Color penguinGoldGlow = Color(0x33FF9F1C);     // Warm Welcoming Halo Glow
+  // Architectural Minimalist Core Palette (Monochromatic Ink & Paper)
+  static const Color inkBlack = Color(0xFF0A0C0E);            // Deep Matte Obsidian Canvas
+  static const Color inkSurface = Color(0xFF121519);          // Structural Surface Elevation
+  static const Color inkCard = Color(0xFF16191E);             // Architectural Card Container
+  static const Color inkBorder = Color(0xFF232830);           // Hairline Graphite Border (0.5-1px)
+  static const Color inkBorderActive = Color(0xFF3A4250);     // Active / Focused Hairline Border
+  static const Color paperWhite = Color(0xFFF0F3F6);          // Crisp High-Contrast Text
+  static const Color paperMuted = Color(0xFF8A94A0);          // Refined Editorial Slate Text
+  static const Color paperSubtle = Color(0xFF525A66);         // Muted Metadata & Timestamp Text
+  static const Color titanium = Color(0xFFFFFFFF);            // Pure Titanium White Highlight
+  static const Color titaniumSoft = Color(0xFFE2E8F0);        // Soft Titanium Accent
 
-  // Primary Brand Colors (Vibrant Penguin Theme)
-  static const Color pingoPurple = Color(0xFFFF9F1C);         // Primary Brand: Golden Amber Beak
-  static const Color pingoPurpleLight = Color(0xFFFFF3E0);    // Warm Amber Tint
-  static const Color pingoPurpleSubtle = Color(0xFFFFF8E1);   // Subtle Amber Frost
-  static const Color pingoBackground = Color(0xFFF8FAFC);     // Clean Light Porcelain
-  static const Color pingoSurface = Color(0xFFFFFFFF);        // Crisp White Card
-  static const Color pingoBorder = Color(0xFFE2E8F0);         // Crisp Border
-  static const Color pingoDark = Color(0xFF0F172A);           // Deep Tuxedo Heading
-  static const Color pingoMuted = Color(0xFF6B7280);          // Subtitle Muted Gray
-  static const Color pingoLightMuted = Color(0xFF64748B);     // Muted Gray
+  // Legacy/Semantic Compatibility Tokens (Mapped to Architectural Minimalist Palette)
+  static const Color penguinBlack = inkBlack;
+  static const Color penguinSurface = inkSurface;
+  static const Color penguinCard = inkCard;
+  static const Color penguinBorder = inkBorder;
+  static const Color penguinBeak = titanium;                  // Replaced orange with crisp titanium white
+  static const Color penguinOrange = titanium;                // Replaced vibrant orange with white
+  static const Color penguinGlacier = paperWhite;
+  static const Color penguinSnow = paperWhite;
+  static const Color penguinFrost = paperWhite;
+  static const Color penguinMuted = paperMuted;
+  static const Color penguinGoldGlow = Color(0x1AFFFFFF);     // Subtle white ambient glow
 
-  // Semantic Accents
-  static const Color success = Color(0xFF10B981);             // Emerald Ice
-  static const Color warning = Color(0xFFF59E0B);             // Amber
-  static const Color overdue = Color(0xFFEF4444);             // Coral Urgent
-  static const Color info = Color(0xFF0EA5E9);                // Glacier Ocean Blue
+  // Primary Brand Colors
+  static const Color pingoPurple = titanium;
+  static const Color pingoPurpleLight = Color(0xFF1E232B);
+  static const Color pingoPurpleSubtle = Color(0xFF16191E);
+  static const Color pingoBackground = inkBlack;
+  static const Color pingoSurface = inkSurface;
+  static const Color pingoBorder = inkBorder;
+  static const Color pingoDark = paperWhite;
+  static const Color pingoMuted = paperMuted;
+  static const Color pingoLightMuted = paperSubtle;
 
-  // Category Colors with High Vibrancy
-  static const Color categoryMedicine = Color(0xFFF43F5E);    // Rose / Medicine
-  static const Color categoryBill = Color(0xFFFF9F1C);        // Beak Amber / Bill
-  static const Color categoryWork = Color(0xFF0EA5E9);        // Glacier Blue / Work
-  static const Color categoryPersonal = Color(0xFFA855F7);    // Violet / Personal
-  static const Color categoryBirthday = Color(0xFFFF7A00);    // Orange / Birthday
+  // Semantic Indicators (Muted, Architectural, Non-Cartoony)
+  static const Color success = Color(0xFF98C379);             // Muted Sage Green
+  static const Color warning = Color(0xFFE5C07B);             // Muted Ochre
+  static const Color overdue = Color(0xFFE06C75);             // Subtle Crimson Dot
+  static const Color info = Color(0xFF61AFEF);                // Muted Slate Blue
+
+  // Category Colors (Monochrome Tone Palette)
+  static const Color categoryMedicine = Color(0xFFE06C75);
+  static const Color categoryBill = Color(0xFFE5C07B);
+  static const Color categoryWork = Color(0xFF61AFEF);
+  static const Color categoryPersonal = Color(0xFFD19A66);
+  static const Color categoryBirthday = Color(0xFF98C379);
 
   // Category Badges in Vault
-  static const Color vaultIdentity = Color(0xFFA855F7);
-  static const Color vaultFinance = Color(0xFFFF9F1C);
-  static const Color vaultHealth = Color(0xFFF43F5E);
-  static const Color vaultEducation = Color(0xFF10B981);
+  static const Color vaultIdentity = paperMuted;
+  static const Color vaultFinance = paperMuted;
+  static const Color vaultHealth = paperMuted;
+  static const Color vaultEducation = paperMuted;
 
   // Backward-compatible aliases
-  static const Color brandPrimary = penguinBeak;
-  static const Color brandSecondary = penguinGlacier;
-  static const Color lightBg = pingoBackground;
-  static const Color lightSurface = pingoSurface;
-  static const Color lightBorder = pingoBorder;
-  static const Color lightTextPrimary = pingoDark;
-  static const Color lightTextSecondary = pingoMuted;
-  static const Color lightTextMuted = pingoLightMuted;
-  static const Color navyDark = penguinBlack;
-  static const Color navySlate = penguinSurface;
+  static const Color brandPrimary = titanium;
+  static const Color brandSecondary = paperWhite;
+  static const Color lightBg = inkBlack;
+  static const Color lightSurface = inkSurface;
+  static const Color lightBorder = inkBorder;
+  static const Color lightTextPrimary = paperWhite;
+  static const Color lightTextSecondary = paperMuted;
+  static const Color lightTextMuted = paperSubtle;
+  static const Color navyDark = inkBlack;
+  static const Color navySlate = inkSurface;
 
-  // Dark Theme (Penguin Tuxedo & Glacier Frost)
-  static const Color darkBg = penguinBlack;
-  static const Color darkSurface = penguinSurface;
-  static const Color darkBorder = penguinBorder;
-  static const Color darkTextPrimary = penguinSnow;
-  static const Color darkTextSecondary = penguinFrost;
-  static const Color darkTextMuted = penguinMuted;
+  // Dark Theme
+  static const Color darkBg = inkBlack;
+  static const Color darkSurface = inkSurface;
+  static const Color darkBorder = inkBorder;
+  static const Color darkTextPrimary = paperWhite;
+  static const Color darkTextSecondary = paperMuted;
+  static const Color darkTextMuted = paperSubtle;
 }

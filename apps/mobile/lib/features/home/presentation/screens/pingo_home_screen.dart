@@ -1,34 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pingo_mobile/core/services/notification_service.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
+import 'package:pingo_mobile/core/typography/app_typography.dart';
+import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
+import 'package:pingo_mobile/features/home/presentation/state/home_reminder_provider.dart';
 import 'package:pingo_mobile/features/session_chat/presentation/screens/pingo_flow_screen.dart';
 import 'package:pingo_mobile/features/vault/presentation/screens/pingo_vault_screen.dart';
 import 'package:pingo_mobile/features/vault/presentation/screens/pingo_add_document_screen.dart';
 import 'package:pingo_mobile/features/voice_capture/presentation/screens/pingo_voice_screen.dart';
 import 'package:pingo_mobile/features/profile/presentation/screens/pingo_profile_screen.dart';
 
-/// The flagship Home Screen implementing '1. Home.png' with 100% fidelity.
-class PingoHomeScreen extends StatefulWidget {
+/// Flagship Architectural Minimalist Dashboard for Pingo.
+/// Monochromatic ink & paper aesthetic, live task agenda, and precision voice/text input.
+class PingoHomeScreen extends ConsumerStatefulWidget {
   const PingoHomeScreen({super.key});
 
   @override
-  State<PingoHomeScreen> createState() => _PingoHomeScreenState();
+  ConsumerState<PingoHomeScreen> createState() => _PingoHomeScreenState();
 }
 
-class _PingoHomeScreenState extends State<PingoHomeScreen>
-    with SingleTickerProviderStateMixin {
+class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen> {
   final TextEditingController _inputController = TextEditingController();
-  late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..repeat(reverse: true);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationService.instance.requestPermissions();
     });
@@ -37,7 +35,6 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
   @override
   void dispose() {
     _inputController.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
@@ -66,367 +63,381 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
     }
   }
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning.';
-    if (hour < 17) return 'Good afternoon.';
-    return 'Good evening.';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBg : AppColors.pingoBackground;
-    final cardBg = isDark ? AppColors.darkSurface : AppColors.pingoSurface;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.pingoBorder;
-    final textColor = isDark ? Colors.white : AppColors.pingoDark;
-    final mutedColor = isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted;
-
-    final formattedDate = DateFormat('EEEE, MMMM d').format(DateTime.now());
+    final reminderState = ref.watch(homeReminderProvider);
+    final reminders = reminderState.reminders;
+    final pendingCount = reminders.where((r) => !r.isDone).length;
+    final now = DateTime.now();
+    final formattedDate = DateFormat('EEE, d MMM').format(now).toUpperCase();
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: AppColors.inkBlack,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Bar: Pingo Bell Logo on Left, Vault Button on Right
-              Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Editorial Masthead
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Logo + Bell Button (Opens Profile)
-                  InkWell(
-                    onTap: () => PingoProfileScreen.open(context),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: AppColors.success,
                               shape: BoxShape.circle,
-                              color: AppColors.penguinBeak.withValues(alpha: 0.15),
-                            ),
-                            child: const Icon(
-                              Icons.notifications_active_rounded,
-                              color: AppColors.penguinBeak,
-                              size: 20,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 7),
                           Text(
-                            'Pingo',
-                            style: TextStyle(
-                              fontSize: 23,
-                              fontWeight: FontWeight.w800,
-                              color: textColor,
-                              letterSpacing: -0.4,
+                            'PINGO • EXECUTIVE SYSTEM',
+                            style: AppTypography.monoLabel(
+                              color: AppColors.paperSubtle,
+                              fontSize: 10,
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'PINGO.',
+                        style: AppTypography.masthead(color: AppColors.paperWhite),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      _actionPill(formattedDate, null, false),
+                      const SizedBox(width: 8),
+                      _actionPill('VAULT', () => PingoVaultScreen.open(context), true),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(color: AppColors.inkBorder, height: 1, thickness: 1),
+
+            // 2. Metrics Rule Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'AGENDA — $pendingCount PENDING',
+                    style: AppTypography.monoLabel(
+                      color: AppColors.paperSubtle,
+                      fontSize: 11,
                     ),
                   ),
-
-                  // Vault Circular Button
                   InkWell(
-                    onTap: () => PingoVaultScreen.open(context),
-                    borderRadius: BorderRadius.circular(24),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: borderColor,
-                          width: 1.2,
-                        ),
-                        color: cardBg,
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.folder_outlined,
-                          size: 20,
-                          color: textColor,
-                        ),
+                    onTap: () => PingoProfileScreen.open(context),
+                    child: Text(
+                      'STATUS: ONLINE',
+                      style: AppTypography.monoLabel(
+                        color: AppColors.paperMuted,
+                        fontSize: 11,
                       ),
                     ),
                   ),
                 ],
               ),
+            ),
 
-              const SizedBox(height: 28),
-
-              // Date Caption
-              Text(
-                formattedDate,
-                style: TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w500,
-                  color: mutedColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Large Bold Headline
-              Text(
-                '${_getGreeting()}\nWhat should I\nremember?',
-                style: TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  height: 1.2,
-                  color: textColor,
-                  letterSpacing: -0.6,
-                ),
-              ),
-
-              const Spacer(flex: 3),
-
-              // Hero Pulsing Voice Mic Button
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AnimatedBuilder(
-                      animation: _pulseController,
-                      builder: (context, child) {
-                        final scale = 1.0 + (_pulseController.value * 0.08);
-                        final outerR = 115.0 * scale;
-                        final midR = 92.0 * scale;
-
-                        return SizedBox(
-                          width: 230,
-                          height: 230,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Outer Ring
-                              Container(
-                                width: outerR * 2,
-                                height: outerR * 2,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.penguinBeak.withValues(alpha: 0.08),
-                                ),
-                              ),
-                              // Mid Ring
-                              Container(
-                                width: midR * 2,
-                                height: midR * 2,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.penguinBeak.withValues(alpha: 0.16),
-                                ),
-                              ),
-                              // Solid Penguin Beak Gradient Button
-                              GestureDetector(
-                                onTap: () {
-                                  PingoVoiceScreen.show(context, onSpeechFinished: (speech) {
-                                    _submitText(speech);
-                                  });
-                                },
-                                child: Container(
-                                  width: 130,
-                                  height: 130,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        AppColors.penguinBeak,
-                                        AppColors.penguinOrange,
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.penguinBeak.withValues(alpha: 0.45),
-                                        blurRadius: 32,
-                                        spreadRadius: 2,
-                                        offset: const Offset(0, 10),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.mic_rounded,
-                                      color: Colors.white,
-                                      size: 56,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+            // 3. Live Agenda / Tasks List (Architectural Rows)
+            Expanded(
+              child: reminders.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'NO PENDING TASKS',
+                            style: AppTypography.monoLabel(
+                              color: AppColors.paperSubtle,
+                              fontSize: 12,
+                            ),
                           ),
-                        );
+                          const SizedBox(height: 6),
+                          Text(
+                            'Speak or type below to create an instant reminder.',
+                            style: AppTypography.bodySmall(color: AppColors.paperSubtle),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      itemCount: reminders.length,
+                      separatorBuilder: (context, index) => const Divider(
+                        color: AppColors.inkBorder,
+                        height: 1,
+                        thickness: 0.8,
+                      ),
+                      itemBuilder: (context, index) {
+                        final item = reminders[index];
+                        return _buildReminderRow(item);
                       },
                     ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Tap and speak to Pingo',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: mutedColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            ),
 
-              const Spacer(flex: 3),
-
-              // Quick Suggestion Chips (Adaptive Dark/Light)
-              Center(
-                child: Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
+            // 4. Quick Architectural Filter Pills
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    _chip('What do I have today?', cardBg, borderColor, textColor, () {
+                    _chip('TODAY\'S AGENDA', () {
                       PingoFlowScreen.open(
                         context,
                         scenario: FlowScenario.askAboutToday,
                         prompt: 'What do I have today?',
                       );
                     }),
-                    _chip('Test alert', cardBg, borderColor, textColor, () {
+                    const SizedBox(width: 8),
+                    _chip('TEST ALERT', () {
                       PingoFlowScreen.open(
                         context,
                         scenario: FlowScenario.autoSaved,
                         prompt: 'test alert',
                       );
                     }),
-                    _chip('Medicine at 9 pm', cardBg, borderColor, textColor, () {
-                      PingoFlowScreen.open(
-                        context,
-                        scenario: FlowScenario.autoSaved,
-                        prompt: 'Medicine every day 9 pm',
-                      );
-                    }),
-                    _chip('Pay bill on 10th', cardBg, borderColor, textColor, () {
-                      PingoFlowScreen.open(
-                        context,
-                        scenario: FlowScenario.autoSaved,
-                        prompt: 'Pay bill on the 10th',
-                      );
+                    const SizedBox(width: 8),
+                    _chip('NEW REMINDER', () {
+                      PingoVoiceScreen.show(context, onSpeechFinished: (speech) {
+                        _submitText(speech);
+                      });
                     }),
                   ],
                 ),
               ),
+            ),
 
-              const SizedBox(height: 20),
-
-              // Sleek Bottom Input Dock
-              Container(
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(36),
-                  border: Border.all(color: borderColor, width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.05),
-                      blurRadius: 18,
-                      offset: const Offset(0, 4),
+            // 5. Precision Bottom Input Dock
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.inkSurface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.inkBorder, width: 1),
+              ),
+              child: Row(
+                children: [
+                  // Attachment button
+                  InkWell(
+                    onTap: () => PingoAddDocumentScreen.open(context),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      child: Text(
+                        'DOC',
+                        style: AppTypography.monoLabel(
+                          color: AppColors.paperSubtle,
+                          fontSize: 11,
+                        ),
+                      ),
                     ),
-                  ],
+                  ),
+
+                  // Mic voice trigger
+                  InkWell(
+                    onTap: () {
+                      PingoVoiceScreen.show(context, onSpeechFinished: (speech) {
+                        _submitText(speech);
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      child: Text(
+                        'MIC',
+                        style: AppTypography.monoLabel(
+                          color: AppColors.paperWhite,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 4),
+
+                  // Text input
+                  Expanded(
+                    child: TextField(
+                      controller: _inputController,
+                      onSubmitted: _submitText,
+                      style: AppTypography.bodyMedium(color: AppColors.paperWhite),
+                      decoration: InputDecoration(
+                        hintText: 'Type or speak in English, বাংলা...',
+                        hintStyle: AppTypography.bodyMedium(color: AppColors.paperSubtle),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                      ),
+                    ),
+                  ),
+
+                  // Send button
+                  InkWell(
+                    onTap: () => _submitText(_inputController.text),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.titanium,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'ENTER',
+                        style: AppTypography.monoLabel(
+                          color: AppColors.inkBlack,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReminderRow(ReminderItem item) {
+    final timeStr = DateFormat('h:mm a').format(item.dueAt);
+    final dateStr = DateFormat('d MMM').format(item.dueAt).toUpperCase();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Minimalist circular toggle ring
+          InkWell(
+            onTap: () {
+              ref.read(homeReminderProvider.notifier).toggleDone(item.id);
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: item.isDone ? AppColors.paperSubtle : AppColors.paperWhite,
+                  width: 1.5,
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                child: Row(
-                  children: [
-                    // Paperclip Document Add Button
-                    IconButton(
-                      icon: const Icon(
-                        Icons.attach_file_rounded,
-                        color: Color(0xFF6B7280),
-                        size: 24,
-                      ),
-                      tooltip: 'Add document',
-                      onPressed: () => PingoAddDocumentScreen.open(context),
-                    ),
+                color: item.isDone ? AppColors.paperSubtle : Colors.transparent,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
 
-                    // Borderless Text Field
-                    Expanded(
-                      child: TextField(
-                        controller: _inputController,
-                        onSubmitted: _submitText,
-                        style: TextStyle(color: textColor, fontSize: 15),
-                        decoration: const InputDecoration(
-                          hintText: 'Or type, or add a document',
-                          hintStyle: TextStyle(
-                            color: Color(0xFF9CA3AF),
-                            fontSize: 14.5,
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                        ),
-                      ),
-                    ),
+          // Title & Metadata
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: AppTypography.bodyLarge(
+                    color: item.isDone ? AppColors.paperSubtle : AppColors.paperWhite,
+                  ).copyWith(
+                    decoration: item.isDone ? TextDecoration.lineThrough : null,
+                    decorationColor: AppColors.paperSubtle,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$dateStr • $timeStr',
+                  style: AppTypography.monoLabel(
+                    color: AppColors.paperSubtle,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-                    // Solid Penguin Beak Up-Arrow Button
-                    GestureDetector(
-                      onTap: () => _submitText(_inputController.text),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.penguinBeak,
-                              AppColors.penguinOrange,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.arrow_upward_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+          // Delete Action
+          InkWell(
+            onTap: () {
+              ref.read(homeReminderProvider.notifier).deleteReminder(item.id);
+            },
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Text(
+                'DEL',
+                style: AppTypography.monoLabel(
+                  color: AppColors.paperSubtle,
+                  fontSize: 10,
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-              const SizedBox(height: 8),
-            ],
+  Widget _actionPill(String label, VoidCallback? onTap, bool isInteractive) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.inkSurface,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.inkBorder, width: 1),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.monoLabel(
+            color: isInteractive ? AppColors.paperWhite : AppColors.paperMuted,
+            fontSize: 11,
           ),
         ),
       ),
     );
   }
 
-  Widget _chip(String label, Color bg, Color border, Color textColor, VoidCallback onTap) {
+  Widget _chip(String label, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: border, width: 1.2),
-          color: bg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.inkBorder, width: 1),
+          color: AppColors.inkSurface,
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w600,
-            color: textColor,
+          style: AppTypography.monoLabel(
+            color: AppColors.paperWhite,
+            fontSize: 10.5,
           ),
         ),
       ),
     );
   }
 }
-
