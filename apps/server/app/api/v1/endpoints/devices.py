@@ -3,7 +3,8 @@ import logging
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.security import get_current_user
+from typing import Optional
+from app.core.security import get_current_user, get_current_user_optional
 from app.db.session import get_db
 from app.models.device_token import DeviceToken
 from app.models.user import User
@@ -72,17 +73,24 @@ async def register_device_token(
 )
 async def test_push_notification(
     request: TestPushRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ) -> TestPushResponse:
     """Dispatches a test high-priority FCM notification to verified device token(s)."""
     targets = []
     if request.token:
         targets.append(request.token)
-    else:
+    elif current_user:
         stmt = select(DeviceToken.token).where(DeviceToken.user_id == current_user.id)
         result = await db.execute(stmt)
         targets = list(result.scalars().all())
+    else:
+        return TestPushResponse(
+            status="warning",
+            message="Please provide a device token or log in with an authenticated account to test push.",
+            sent_count=0,
+            details=[],
+        )
 
     if not targets:
         return TestPushResponse(
