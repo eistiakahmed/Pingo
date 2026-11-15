@@ -89,7 +89,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
       if (mounted) {
         setState(() {
           _activeScenario = FlowScenario.autoSaved;
-          _taskTitle = 'Instant Test Alert 🔔';
+          _taskTitle = 'Instant Test Alert';
           _taskDate = 'Today';
           _taskTime = DateFormat.jm().format(DateTime.now());
           _isLoadingAi = false;
@@ -97,8 +97,8 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           _conversationHistory.add({
             'isUser': false,
             'text': isPermitted
-                ? '🔔 Triggered an instant test notification on your screen right now!\n\nIf you see the notification banner and hear the sound, notifications are working 100%.'
-                : '⚠️ Notifications are currently BLOCKED in your phone settings.\n\nPlease open your phone\'s Settings > Apps > Pingo > Notifications and turn on:\n• Allow notifications\n• Floating notifications\n• Lock screen notifications',
+                ? 'Triggered an instant test notification on your screen.\n\nIf you see the notification banner and hear the sound, alerts are operational.'
+                : 'Notifications are currently disabled in device settings.\n\nPlease open your phone\'s Settings > Apps > Pingo > Notifications and turn on:\n• Allow notifications\n• Floating notifications\n• Lock screen notifications',
           });
         });
       }
@@ -428,8 +428,8 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         lower.contains('check notification');
     if (isTestAlert) {
       await NotificationService.instance.showInstantTestNotification(
-        title: 'Pingo Test Alert 🔔',
-        body: 'Alarms & notifications are active and punctually working!',
+        title: 'Pingo Test Alert',
+        body: 'Alarms and notifications are active and punctually working.',
       );
       final isPermitted =
           await NotificationService.instance.areNotificationsEnabled();
@@ -445,19 +445,19 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           _conversationHistory.add({
             'isUser': false,
             'text':
-                '🔔 Instant test alert sent!\n\nAll notification and exact alarm permissions are active.\n\n📱 Xiaomi (HyperOS / MIUI) Notice:\nTo ensure alarms ring when screen is off or app is closed:\n1. Open Settings > Apps > Manage Apps > Pingo\n2. Turn ON "Autostart"\n3. Change Battery Saver to "No restrictions"',
+                'Instant test alert sent.\n\nAll notification and exact alarm permissions are active.\n\nXiaomi (HyperOS / MIUI) Notice:\nTo ensure alarms ring when screen is off or app is closed:\n1. Open Settings > Apps > Manage Apps > Pingo\n2. Turn ON "Autostart"\n3. Change Battery Saver to "No restrictions"',
           });
         } else if (!isPermitted) {
           _conversationHistory.add({
             'isUser': false,
             'text':
-                '⚠️ Notifications are currently BLOCKED in your phone settings.\n\nPlease open Settings > Apps > Pingo > Notifications and turn on:\n• Allow notifications\n• Floating notifications (heads-up banners)\n• Lock screen notifications',
+                'Notifications are currently disabled in device settings.\n\nPlease open Settings > Apps > Pingo > Notifications and turn on:\n• Allow notifications\n• Floating notifications (heads-up banners)\n• Lock screen notifications',
           });
         } else {
           _conversationHistory.add({
             'isUser': false,
             'text':
-                '⚠️ Exact Alarms permission is restricted on your device.\n\nPlease open Settings > Apps > Pingo > Alarms & reminders and allow "Setting alarms and reminders" for exact timing.',
+                'Exact Alarms permission is restricted on your device.\n\nPlease open Settings > Apps > Pingo > Alarms & reminders and allow "Setting alarms and reminders" for exact timing.',
           });
         }
       });
@@ -782,7 +782,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Pingo 🐧',
+                    'Pingo',
                     style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w700,
@@ -1105,19 +1105,19 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _chip('🔄 Repeat weekly', cardBg, borderColor, textColor, () {
+            _chip('Repeat weekly', cardBg, borderColor, textColor, () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Set to repeat weekly')),
               );
             }),
-            _chip('☀️ Move to tomorrow', cardBg, borderColor, textColor, () {
+            _chip('Move to tomorrow', cardBg, borderColor, textColor, () {
               setState(() => _taskDate = 'Tomorrow');
               _handleSend('Move to tomorrow');
             }),
-            _chip('🔔 Test alert now', cardBg, borderColor, textColor, () {
+            _chip('Test alert', cardBg, borderColor, textColor, () {
               _handleSend('test alert');
             }),
-            _chip('❌ Cancel reminder', cardBg, borderColor, textColor, () {
+            _chip('Cancel reminder', cardBg, borderColor, textColor, () {
               _handleSend('Cancel this reminder');
             }),
           ],
@@ -1233,17 +1233,17 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           runSpacing: 8,
           children: [
             if (!isTomorrow)
-              _chip('☀️ What about tomorrow?', cardBg, borderColor, textColor, () {
+              _chip('What about tomorrow?', cardBg, borderColor, textColor, () {
                 _handleSend('What do I have tomorrow?');
               }),
             if (isTomorrow)
-              _chip('📋 What about today?', cardBg, borderColor, textColor, () {
+              _chip('What about today?', cardBg, borderColor, textColor, () {
                 _handleSend('What do I have today?');
               }),
-            _chip('🔔 Test alert sound', cardBg, borderColor, textColor, () {
+            _chip('Test alert', cardBg, borderColor, textColor, () {
               _handleSend('test alert');
             }),
-            _chip('📑 Show all tasks', cardBg, borderColor, textColor, () {
+            _chip('Show all tasks', cardBg, borderColor, textColor, () {
               _handleSend('Show all tasks');
             }),
           ],
@@ -1411,17 +1411,21 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: AppColors.penguinBeak.withValues(alpha: 0.16),
+            color: AppColors.penguinOrange.withValues(alpha: 0.16),
             shape: BoxShape.circle,
             border: Border.all(
-              color: AppColors.penguinBeak.withValues(alpha: 0.35),
+              color: AppColors.penguinOrange.withValues(alpha: 0.35),
               width: 1.2,
             ),
           ),
           child: const Center(
             child: Text(
-              '🐧',
-              style: TextStyle(fontSize: 15),
+              'P',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: AppColors.penguinOrange,
+              ),
             ),
           ),
         ),

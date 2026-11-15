@@ -94,7 +94,7 @@ class _HubScreenState extends State<HubScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${_getTimeGreeting()}, ইশতিয়াক 👋',
+                        '${_getTimeGreeting()}, ইশতিয়াক',
                         style: AppTypography.headlineMedium(
                           color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                         ),

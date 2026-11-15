@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pingo_mobile/core/crypto/crypto_helper.dart';
 import 'package:pingo_mobile/core/network/providers.dart';
+import 'package:pingo_mobile/core/services/fcm_service.dart';
 import 'package:pingo_mobile/core/services/notification_service.dart';
 import 'package:pingo_mobile/core/storage/local_storage_service.dart';
 import 'package:pingo_mobile/features/home/data/sync_api_service.dart';
@@ -100,6 +101,9 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
 
       // Pull updates from AWS PostgreSQL
       await pullFromServer(syncApi);
+
+      // Register device FCM push token with backend
+      FcmService.instance.registerActiveToken();
     } catch (e) {
       debugPrint('[HomeReminderNotifier] Cloud sync init warning: $e');
     }

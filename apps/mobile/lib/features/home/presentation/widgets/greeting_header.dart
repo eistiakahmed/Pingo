@@ -62,7 +62,7 @@ class GreetingHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: AppConstants.spacing4),
                 Text(
-                  '${_getTimeGreeting()}, $userName 👋',
+                  '${_getTimeGreeting()}, $userName',
                   style: AppTypography.headlineMedium(
                     color: isDark
                         ? AppColors.darkTextPrimary

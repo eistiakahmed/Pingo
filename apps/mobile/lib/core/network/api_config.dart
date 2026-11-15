@@ -32,5 +32,6 @@ class ApiConfig {
   static String get aiParseReminder => '$baseUrl$prefixV1/ai/parse-reminder';
   static String get syncPush => '$baseUrl$prefixV1/sync/push';
   static String get syncPull => '$baseUrl$prefixV1/sync/pull';
+  static String get registerDeviceToken => '$baseUrl$prefixV1/devices/register-token';
 }
 

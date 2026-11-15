@@ -92,7 +92,7 @@ class _VaultPlaceholderView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('📁 মেমোরি ভল্ট ও ডকুমেন্টস'),
+        title: const Text('মেমোরি ভল্ট ও ডকুমেন্টস'),
       ),
       body: Center(
         child: Padding(

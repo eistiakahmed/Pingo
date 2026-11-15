@@ -40,6 +40,7 @@ class SyncService:
                     "created_at": r.created_at or now,
                     "updated_at": now,
                     "deleted_at": r.deleted_at,
+                    "notification_sent": False,
                 }
                 for r in request.reminders
             ]
@@ -55,6 +56,7 @@ class SyncService:
                     "algorithm": stmt.excluded.algorithm,
                     "due_at": stmt.excluded.due_at,
                     "is_completed": stmt.excluded.is_completed,
+                    "notification_sent": stmt.excluded.notification_sent,
                     "version": stmt.excluded.version,
                     "updated_at": now,
                     "deleted_at": stmt.excluded.deleted_at,

@@ -157,7 +157,7 @@ class NotificationService {
     final styleInfo = BigTextStyleInformation(
       displayBody,
       htmlFormatBigText: true,
-      contentTitle: '<b>Pingo 🐧</b>',
+      contentTitle: '<b>Pingo</b>',
       htmlFormatContentTitle: true,
       summaryText: 'Reminder',
       htmlFormatSummaryText: true,
@@ -312,22 +312,22 @@ class NotificationService {
 
   /// Shows an instant test notification styled like a message from Pingo.
   Future<bool> showInstantTestNotification({
-    String title = 'Pingo 🐧',
-    String body = 'Hey! This is a test reminder message from Pingo.',
+    String title = 'Pingo',
+    String body = 'This is a test notification from Pingo.',
   }) async {
     if (!_isInitialized) await initialize();
     const styleInfo = BigTextStyleInformation(
-      'Hey! This is a test reminder from Pingo 🐧. Notifications and heads-up banners are working properly!',
+      'This is a test notification from Pingo. Notifications and alerts are operational.',
       htmlFormatBigText: true,
-      contentTitle: '<b>Pingo 🐧</b>',
+      contentTitle: '<b>Pingo</b>',
       htmlFormatContentTitle: true,
       summaryText: 'Message',
       htmlFormatSummaryText: true,
     );
     const androidDetails = AndroidNotificationDetails(
-      _defaultChannelId,
-      _defaultChannelName,
-      channelDescription: _defaultChannelDesc,
+      _urgentChannelId,
+      _urgentChannelName,
+      channelDescription: _urgentChannelDesc,
       importance: Importance.max,
       priority: Priority.max,
       playSound: true,
@@ -337,8 +337,63 @@ class NotificationService {
       styleInformation: styleInfo,
     );
     const details = NotificationDetails(android: androidDetails);
-    await _notificationsPlugin.show(999999, 'Pingo 🐧', body, details);
+    await _notificationsPlugin.show(999999, 'Pingo', body, details);
     return true;
+  }
+
+  /// Displays an incoming FCM Push Notification directly as a high-priority heads-up banner.
+  Future<void> showPushNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    if (!_isInitialized) await initialize();
+    final safeId = id.abs() % 2147483647;
+
+    final styleInfo = BigTextStyleInformation(
+      body,
+      htmlFormatBigText: true,
+      contentTitle: '<b>$title</b>',
+      htmlFormatContentTitle: true,
+      summaryText: 'Reminder',
+      htmlFormatSummaryText: true,
+    );
+
+    final androidDetails = AndroidNotificationDetails(
+      _urgentChannelId,
+      _urgentChannelName,
+      channelDescription: _urgentChannelDesc,
+      importance: Importance.max,
+      priority: Priority.max,
+      playSound: true,
+      enableVibration: true,
+      visibility: NotificationVisibility.public,
+      category: AndroidNotificationCategory.message,
+      ticker: title,
+      styleInformation: styleInfo,
+      fullScreenIntent: true,
+    );
+
+    const darwinDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+
+    final notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: darwinDetails,
+    );
+
+    await _notificationsPlugin.show(
+      safeId,
+      title,
+      body,
+      notificationDetails,
+      payload: payload,
+    );
   }
 
   /// Cancels a scheduled notification by its ID.

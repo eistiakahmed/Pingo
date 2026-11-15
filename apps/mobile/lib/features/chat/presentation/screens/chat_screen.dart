@@ -108,7 +108,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 shape: BoxShape.circle,
               ),
               child: const Center(
-                child: Text('🔔', style: TextStyle(fontSize: 18)),
+                child: Text(
+                  'P',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: AppConstants.spacing12),

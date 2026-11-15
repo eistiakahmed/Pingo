@@ -79,6 +79,8 @@ out/
 *.key
 *.keystore
 *.jks
+*firebase*.json
+google-services.json
 
 # Operating System Files
 Thumbs.db

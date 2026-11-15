@@ -48,7 +48,14 @@ class ChatBubble extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: const Center(
-                child: Text('🔔', style: TextStyle(fontSize: 16)),
+                child: Text(
+                  'P',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
           ],

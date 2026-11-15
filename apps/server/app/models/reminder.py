@@ -36,6 +36,9 @@ class EncryptedReminder(Base):
         DateTime(timezone=True), nullable=True, index=True
     )
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notification_sent: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
 
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

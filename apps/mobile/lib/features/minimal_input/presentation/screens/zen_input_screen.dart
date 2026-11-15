@@ -27,11 +27,11 @@ class _ZenInputScreenState extends State<ZenInputScreen> {
   void _handleTextSubmission(String input) {
     final lower = input.toLowerCase();
     if (lower.contains('remind') || lower.contains('doctor') || lower.contains('meeting') || lower.contains('মনে')) {
-      _triggerFeedback('✓ Reminder scheduled in memory');
+      _triggerFeedback('Reminder scheduled in memory');
     } else if (lower.contains('doc') || lower.contains('note') || lower.contains('summary') || lower.contains('ডকুমেন্ট')) {
-      _triggerFeedback('✓ Document created & saved to vault');
+      _triggerFeedback('Document created and saved to vault');
     } else {
-      _triggerFeedback('✓ Thought saved to memory');
+      _triggerFeedback('Thought saved to memory');
     }
   }
 

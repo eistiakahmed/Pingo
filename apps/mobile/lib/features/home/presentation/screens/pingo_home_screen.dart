@@ -119,7 +119,7 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Pingo 🐧',
+                            'Pingo',
                             style: TextStyle(
                               fontSize: 23,
                               fontWeight: FontWeight.w800,
@@ -267,7 +267,7 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      'Tap and speak to Pingo 🐧',
+                      'Tap and speak to Pingo',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -287,28 +287,28 @@ class _PingoHomeScreenState extends State<PingoHomeScreen>
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _chip('☀️ What do I have today?', cardBg, borderColor, textColor, () {
+                    _chip('What do I have today?', cardBg, borderColor, textColor, () {
                       PingoFlowScreen.open(
                         context,
                         scenario: FlowScenario.askAboutToday,
                         prompt: 'What do I have today?',
                       );
                     }),
-                    _chip('🔔 Test alert', cardBg, borderColor, textColor, () {
+                    _chip('Test alert', cardBg, borderColor, textColor, () {
                       PingoFlowScreen.open(
                         context,
                         scenario: FlowScenario.autoSaved,
                         prompt: 'test alert',
                       );
                     }),
-                    _chip('💊 Medicine every day 9 pm', cardBg, borderColor, textColor, () {
+                    _chip('Medicine at 9 pm', cardBg, borderColor, textColor, () {
                       PingoFlowScreen.open(
                         context,
                         scenario: FlowScenario.autoSaved,
                         prompt: 'Medicine every day 9 pm',
                       );
                     }),
-                    _chip('⚡ Pay bill on the 10th', cardBg, borderColor, textColor, () {
+                    _chip('Pay bill on 10th', cardBg, borderColor, textColor, () {
                       PingoFlowScreen.open(
                         context,
                         scenario: FlowScenario.autoSaved,
