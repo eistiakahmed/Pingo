@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import 'package:pingo_mobile/core/services/notification_service.dart';
-import 'package:pingo_mobile/core/theme/app_colors.dart';
-import 'package:pingo_mobile/core/typography/app_typography.dart';
-import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
-import 'package:pingo_mobile/features/home/presentation/state/home_reminder_provider.dart';
-import 'package:pingo_mobile/features/session_chat/presentation/screens/pingo_flow_screen.dart';
-import 'package:pingo_mobile/features/vault/presentation/screens/pingo_vault_screen.dart';
-import 'package:pingo_mobile/features/vault/presentation/screens/pingo_add_document_screen.dart';
-import 'package:pingo_mobile/features/voice_capture/presentation/screens/pingo_voice_screen.dart';
-import 'package:pingo_mobile/features/profile/presentation/screens/pingo_profile_screen.dart';
+import '../../../../core/services/notification_service.dart';
+import '../../../vault/presentation/screens/pingo_vault_screen.dart';
+import '../../../voice_capture/presentation/screens/pingo_voice_screen.dart';
+import '../state/pingo_chat_provider.dart';
+import '../widgets/chat_message_bubble.dart';
+import '../widgets/penguin_mascot_widget.dart';
+import '../widgets/typing_indicator_widget.dart';
 
-/// Flagship Architectural Minimalist Dashboard for Pingo.
-/// Monochromatic ink & paper aesthetic, live task agenda, and precision voice/text input.
+/// Flagship Conversational Interface for Pingo.
+/// Minimalist dark-mode conversational thread with cute animated mascot onboarding,
+/// rounded message bubbles, dynamic typing indicator, and haptic voice activation.
 class PingoHomeScreen extends ConsumerStatefulWidget {
   const PingoHomeScreen({super.key});
 
@@ -23,6 +21,7 @@ class PingoHomeScreen extends ConsumerStatefulWidget {
 
 class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen> {
   final TextEditingController _inputController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -35,282 +34,289 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen> {
   @override
   void dispose() {
     _inputController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _submitText(String text) {
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+
+  void _handleSend(String text) {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
+    HapticFeedback.lightImpact();
     _inputController.clear();
+    ref.read(pingoChatProvider.notifier).sendMessage(trimmed);
+    _scrollToBottom();
+  }
 
-    final lower = trimmed.toLowerCase();
+  void _triggerVoiceInput() {
+    // Tactile haptic feedback on microphone activation
+    HapticFeedback.mediumImpact();
 
-    // Task inquiry detection (today, tomorrow, all tasks)
-    final isQueryTasks = lower.contains('what do i have') ||
-        lower.contains('task') ||
-        lower.contains('tasks') ||
-        lower.contains('schedule') ||
-        lower.contains('কী আছে') ||
-        lower.contains('কি আছে') ||
-        lower.contains('টাস্ক') ||
-        (lower.contains('what') && lower.contains('tomorrow')) ||
-        (lower.contains('what') && lower.contains('today'));
-
-    if (isQueryTasks) {
-      PingoFlowScreen.open(context, scenario: FlowScenario.askAboutToday, prompt: trimmed);
-    } else {
-      PingoFlowScreen.open(context, scenario: FlowScenario.autoSaved, prompt: trimmed);
-    }
+    PingoVoiceScreen.show(
+      context,
+      onSpeechFinished: (speechText) {
+        if (speechText.trim().isNotEmpty) {
+          ref.read(pingoChatProvider.notifier).sendMessage(speechText);
+          _scrollToBottom();
+        }
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final reminderState = ref.watch(homeReminderProvider);
-    final reminders = reminderState.reminders;
-    final pendingCount = reminders.where((r) => !r.isDone).length;
-    final now = DateTime.now();
-    final formattedDate = DateFormat('EEE, d MMM').format(now).toUpperCase();
+    final chatState = ref.watch(pingoChatProvider);
+    final isBangla = chatState.language == 'bn';
 
     return Scaffold(
-      backgroundColor: AppColors.inkBlack,
+      backgroundColor: const Color(0xFF080B11), // Deep Antarctic Midnight
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Editorial Masthead
+            // Top Navigation & Bilingual Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // Cute Mini Penguin Mascot Badge
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF131B2A),
+                      border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
+                    ),
+                    child: const Center(
+                      child: Text('🐧', style: TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+
+                  // Brand & Engine Status Dot
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const Text(
+                        'Pingo',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFF8FAFC),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
                       Row(
                         children: [
                           Container(
                             width: 6,
                             height: 6,
                             decoration: const BoxDecoration(
-                              color: AppColors.success,
                               shape: BoxShape.circle,
+                              color: Color(0xFF10B981),
                             ),
                           ),
-                          const SizedBox(width: 7),
+                          const SizedBox(width: 5),
                           Text(
-                            'PINGO • EXECUTIVE SYSTEM',
-                            style: AppTypography.monoLabel(
-                              color: AppColors.paperSubtle,
-                              fontSize: 10,
+                            isBangla ? 'সক্রিয় · প্রস্তুত' : 'Online · Ready',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'PINGO.',
-                        style: AppTypography.masthead(color: AppColors.paperWhite),
-                      ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      _actionPill(formattedDate, null, false),
-                      const SizedBox(width: 8),
-                      _actionPill('VAULT', () => PingoVaultScreen.open(context), true),
-                    ],
+
+                  const Spacer(),
+
+                  // Bilingual Switcher Pill: [ EN | বাং ]
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131B2A),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF1E293B), width: 1),
+                    ),
+                    padding: const EdgeInsets.all(2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _langPill('বাং', 'bn', isBangla),
+                        _langPill('EN', 'en', !isBangla),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // New Session / Archive Button
+                  IconButton(
+                    tooltip: isBangla ? 'নতুন সেশন' : 'New Session',
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: Color(0xFF94A3B8),
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      ref.read(pingoChatProvider.notifier).startNewSession();
+                    },
+                  ),
+
+                  // Vault Shortcut
+                  IconButton(
+                    tooltip: isBangla ? 'ডকুমেন্ট ভল্ট' : 'Document Vault',
+                    icon: const Icon(
+                      Icons.folder_outlined,
+                      color: Color(0xFF94A3B8),
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const PingoVaultScreen()),
+                      );
+                    },
                   ),
                 ],
               ),
             ),
 
-            const Divider(color: AppColors.inkBorder, height: 1, thickness: 1),
+            const Divider(color: Color(0xFF172033), height: 1),
 
-            // 2. Metrics Rule Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'AGENDA — $pendingCount PENDING',
-                    style: AppTypography.monoLabel(
-                      color: AppColors.paperSubtle,
-                      fontSize: 11,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => PingoProfileScreen.open(context),
-                    child: Text(
-                      'STATUS: ONLINE',
-                      style: AppTypography.monoLabel(
-                        color: AppColors.paperMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // 3. Live Agenda / Tasks List (Architectural Rows)
+            // Conversational Stream / Onboarding Canvas
             Expanded(
-              child: reminders.isEmpty
+              child: chatState.messages.isEmpty
                   ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'NO PENDING TASKS',
-                            style: AppTypography.monoLabel(
-                              color: AppColors.paperSubtle,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Speak or type below to create an instant reminder.',
-                            style: AppTypography.bodySmall(color: AppColors.paperSubtle),
-                          ),
-                        ],
+                      child: PenguinMascotWidget(
+                        language: chatState.language,
+                        onPromptSelected: (prompt) {
+                          _handleSend(prompt);
+                        },
                       ),
                     )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      itemCount: reminders.length,
-                      separatorBuilder: (context, index) => const Divider(
-                        color: AppColors.inkBorder,
-                        height: 1,
-                        thickness: 0.8,
-                      ),
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      itemCount: chatState.messages.length + (chatState.isThinking ? 1 : 0),
                       itemBuilder: (context, index) {
-                        final item = reminders[index];
-                        return _buildReminderRow(item);
+                        if (index < chatState.messages.length) {
+                          final msg = chatState.messages[index];
+                          return ChatMessageBubble(
+                            message: msg,
+                            onActionSelected: (action) {
+                              _handleSend(action);
+                            },
+                          );
+                        } else {
+                          // Dynamic 3-dot typing indicator
+                          return TypingIndicatorWidget(
+                            statusText: isBangla ? 'পিঙ্গো ভাবছে...' : 'Pingo is thinking...',
+                          );
+                        }
                       },
                     ),
             ),
 
-            // 4. Quick Architectural Filter Pills
+            // Bottom Input Dock: Sleek Floating Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _chip('TODAY\'S AGENDA', () {
-                      PingoFlowScreen.open(
-                        context,
-                        scenario: FlowScenario.askAboutToday,
-                        prompt: 'What do I have today?',
-                      );
-                    }),
-                    const SizedBox(width: 8),
-                    _chip('TEST ALERT', () {
-                      PingoFlowScreen.open(
-                        context,
-                        scenario: FlowScenario.autoSaved,
-                        prompt: 'test alert',
-                      );
-                    }),
-                    const SizedBox(width: 8),
-                    _chip('NEW REMINDER', () {
-                      PingoVoiceScreen.show(context, onSpeechFinished: (speech) {
-                        _submitText(speech);
-                      });
-                    }),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111726),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: const Color(0xFF1D263B), width: 1.1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
                   ],
                 ),
-              ),
-            ),
-
-            // 5. Precision Bottom Input Dock
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.inkSurface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.inkBorder, width: 1),
-              ),
-              child: Row(
-                children: [
-                  // Attachment button
-                  InkWell(
-                    onTap: () => PingoAddDocumentScreen.open(context),
-                    borderRadius: BorderRadius.circular(4),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      child: Text(
-                        'DOC',
-                        style: AppTypography.monoLabel(
-                          color: AppColors.paperSubtle,
-                          fontSize: 11,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                child: Row(
+                  children: [
+                    // Text Input Field
+                    Expanded(
+                      child: TextField(
+                        controller: _inputController,
+                        onSubmitted: _handleSend,
+                        style: const TextStyle(
+                          color: Color(0xFFF8FAFC),
+                          fontSize: 14.5,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: isBangla
+                              ? 'পিঙ্গোকে কিছু বলুন বা লিখুন...'
+                              : 'Ask or tell Pingo anything...',
+                          hintStyle: TextStyle(
+                            color: const Color(0xFF94A3B8).withValues(alpha: 0.65),
+                            fontSize: 13.5,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                         ),
                       ),
                     ),
-                  ),
 
-                  // Mic voice trigger
-                  InkWell(
-                    onTap: () {
-                      PingoVoiceScreen.show(context, onSpeechFinished: (speech) {
-                        _submitText(speech);
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      child: Text(
-                        'MIC',
-                        style: AppTypography.monoLabel(
-                          color: AppColors.paperWhite,
-                          fontSize: 11,
+                    // Voice Microphone Trigger with Haptic Feedback
+                    InkWell(
+                      onTap: _triggerVoiceInput,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF1E293B),
+                          border: Border.all(color: const Color(0xFF334155), width: 1),
+                        ),
+                        child: const Icon(
+                          Icons.mic_none_rounded,
+                          color: Color(0xFF38BDF8),
+                          size: 19,
                         ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
 
-                  const SizedBox(width: 4),
-
-                  // Text input
-                  Expanded(
-                    child: TextField(
-                      controller: _inputController,
-                      onSubmitted: _submitText,
-                      style: AppTypography.bodyMedium(color: AppColors.paperWhite),
-                      decoration: InputDecoration(
-                        hintText: 'Type or speak in English, বাংলা...',
-                        hintStyle: AppTypography.bodyMedium(color: AppColors.paperSubtle),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        filled: false,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                      ),
-                    ),
-                  ),
-
-                  // Send button
-                  InkWell(
-                    onTap: () => _submitText(_inputController.text),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.titanium,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'ENTER',
-                        style: AppTypography.monoLabel(
-                          color: AppColors.inkBlack,
-                          fontSize: 11,
+                    // Send Button
+                    InkWell(
+                      onTap: () => _handleSend(_inputController.text),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFF2563EB),
+                              Color(0xFF1D4ED8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_upward_rounded,
+                          color: Colors.white,
+                          size: 19,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -319,122 +325,25 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen> {
     );
   }
 
-  Widget _buildReminderRow(ReminderItem item) {
-    final timeStr = DateFormat('h:mm a').format(item.dueAt);
-    final dateStr = DateFormat('d MMM').format(item.dueAt).toUpperCase();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Minimalist circular toggle ring
-          InkWell(
-            onTap: () {
-              ref.read(homeReminderProvider.notifier).toggleDone(item.id);
-            },
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: item.isDone ? AppColors.paperSubtle : AppColors.paperWhite,
-                  width: 1.5,
-                ),
-                color: item.isDone ? AppColors.paperSubtle : Colors.transparent,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-
-          // Title & Metadata
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: AppTypography.bodyLarge(
-                    color: item.isDone ? AppColors.paperSubtle : AppColors.paperWhite,
-                  ).copyWith(
-                    decoration: item.isDone ? TextDecoration.lineThrough : null,
-                    decorationColor: AppColors.paperSubtle,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$dateStr • $timeStr',
-                  style: AppTypography.monoLabel(
-                    color: AppColors.paperSubtle,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Delete Action
-          InkWell(
-            onTap: () {
-              ref.read(homeReminderProvider.notifier).deleteReminder(item.id);
-            },
-            borderRadius: BorderRadius.circular(4),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Text(
-                'DEL',
-                style: AppTypography.monoLabel(
-                  color: AppColors.paperSubtle,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _actionPill(String label, VoidCallback? onTap, bool isInteractive) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+  Widget _langPill(String label, String langCode, bool isSelected) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        ref.read(pingoChatProvider.notifier).setLanguage(langCode);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: AppColors.inkSurface,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: AppColors.inkBorder, width: 1),
+          borderRadius: BorderRadius.circular(16),
+          color: isSelected ? const Color(0xFF2563EB) : Colors.transparent,
         ),
         child: Text(
           label,
-          style: AppTypography.monoLabel(
-            color: isInteractive ? AppColors.paperWhite : AppColors.paperMuted,
+          style: TextStyle(
             fontSize: 11,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _chip(String label, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: AppColors.inkBorder, width: 1),
-          color: AppColors.inkSurface,
-        ),
-        child: Text(
-          label,
-          style: AppTypography.monoLabel(
-            color: AppColors.paperWhite,
-            fontSize: 10.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF94A3B8),
           ),
         ),
       ),
