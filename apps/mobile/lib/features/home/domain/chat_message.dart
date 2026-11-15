@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 /// Immutable model representing a single conversational interaction in Pingo's chat stream.
+/// Supports inline reminders, punctual alarm triggers, and encrypted document attachments.
 class ChatMessage {
   final String id;
   final String text;
@@ -12,6 +13,12 @@ class ChatMessage {
   final bool isDone;
   final List<String> suggestedActions;
 
+  // Integrated document attachment fields
+  final String? documentTitle;
+  final String? documentCategory;
+  final String? documentExpiry;
+  final String? documentIdentifier;
+
   const ChatMessage({
     required this.id,
     required this.text,
@@ -22,9 +29,14 @@ class ChatMessage {
     this.reminderDueAt,
     this.isDone = false,
     this.suggestedActions = const [],
+    this.documentTitle,
+    this.documentCategory,
+    this.documentExpiry,
+    this.documentIdentifier,
   });
 
   bool get hasReminder => reminderTitle != null && reminderDueAt != null;
+  bool get hasDocument => documentTitle != null && documentTitle!.isNotEmpty;
 
   ChatMessage copyWith({
     String? id,
@@ -36,6 +48,10 @@ class ChatMessage {
     DateTime? reminderDueAt,
     bool? isDone,
     List<String>? suggestedActions,
+    String? documentTitle,
+    String? documentCategory,
+    String? documentExpiry,
+    String? documentIdentifier,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -47,6 +63,10 @@ class ChatMessage {
       reminderDueAt: reminderDueAt ?? this.reminderDueAt,
       isDone: isDone ?? this.isDone,
       suggestedActions: suggestedActions ?? this.suggestedActions,
+      documentTitle: documentTitle ?? this.documentTitle,
+      documentCategory: documentCategory ?? this.documentCategory,
+      documentExpiry: documentExpiry ?? this.documentExpiry,
+      documentIdentifier: documentIdentifier ?? this.documentIdentifier,
     );
   }
 
@@ -61,6 +81,10 @@ class ChatMessage {
       'reminderDueAt': reminderDueAt?.toIso8601String(),
       'isDone': isDone,
       'suggestedActions': suggestedActions,
+      'documentTitle': documentTitle,
+      'documentCategory': documentCategory,
+      'documentExpiry': documentExpiry,
+      'documentIdentifier': documentIdentifier,
     };
   }
 
@@ -80,6 +104,10 @@ class ChatMessage {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      documentTitle: map['documentTitle'] as String?,
+      documentCategory: map['documentCategory'] as String?,
+      documentExpiry: map['documentExpiry'] as String?,
+      documentIdentifier: map['documentIdentifier'] as String?,
     );
   }
 

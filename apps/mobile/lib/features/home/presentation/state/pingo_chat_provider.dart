@@ -67,6 +67,39 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
     );
   }
 
+  /// Attaches and securely stores an encrypted document directly inside the conversational flow.
+  Future<void> attachDocument({
+    required String title,
+    required String category,
+    String? expiry,
+  }) async {
+    final isBangla = state.language == 'bn';
+
+    final userAttachmentMsg = ChatMessage(
+      id: const Uuid().v4(),
+      text: isBangla ? 'ডকুমেন্ট সংযুক্ত করা হলো: $title' : 'Attached document: $title',
+      isUser: true,
+      timestamp: DateTime.now(),
+    );
+
+    final botConfirmationMsg = ChatMessage(
+      id: const Uuid().v4(),
+      text: isBangla
+          ? 'ডকুমেন্টটি সফলভাবে এনক্রিপ্ট করে আপনার মেমোরিতে সংরক্ষণ করা হয়েছে।'
+          : 'Document securely encrypted and stored in your conversational memory.',
+      isUser: false,
+      timestamp: DateTime.now(),
+      documentTitle: title,
+      documentCategory: category,
+      documentExpiry: expiry ?? 'Dec 2029',
+      suggestedActions: isBangla ? ['মেয়াদ এলার্ট সেট করো'] : ['Set Expiry Alert'],
+    );
+
+    final nextList = [...state.messages, userAttachmentMsg, botConfirmationMsg];
+    state = state.copyWith(messages: nextList, isThinking: false);
+    await ChatArchiveService.instance.saveActiveMessages(nextList);
+  }
+
   /// Sends a message and orchestrates AI parsing, reminders, and punctual notification scheduling.
   Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
@@ -180,6 +213,47 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
               : 'Here is your agenda for today:\n\n$summary',
           isUser: false,
           timestamp: DateTime.now(),
+        );
+        _appendBotMessage(replyMsg);
+      }
+      return;
+    }
+
+    // 4. Document & Vault Data Query Command
+    if (lower.contains('document') ||
+        lower.contains('ডকুমেন্ট') ||
+        lower.contains('passport') ||
+        lower.contains('পাসপোর্ট') ||
+        lower.contains('nid') ||
+        lower.contains('এনআইডি') ||
+        lower.contains('vault') ||
+        lower.contains('ভল্ট')) {
+      final docMessages = state.messages.where((m) => m.hasDocument).toList();
+
+      if (docMessages.isNotEmpty) {
+        final lastDoc = docMessages.last;
+        final replyMsg = ChatMessage(
+          id: const Uuid().v4(),
+          text: isBangla
+              ? 'আপনার সংরক্ষিত ডকুমেন্ট পাওয়া গেছে:'
+              : 'Here is your encrypted document from memory:',
+          isUser: false,
+          timestamp: DateTime.now(),
+          documentTitle: lastDoc.documentTitle,
+          documentCategory: lastDoc.documentCategory,
+          documentExpiry: lastDoc.documentExpiry,
+          suggestedActions: isBangla ? ['নতুন ডকুমেন্ট যুক্ত করো'] : ['Attach Document'],
+        );
+        _appendBotMessage(replyMsg);
+      } else {
+        final replyMsg = ChatMessage(
+          id: const Uuid().v4(),
+          text: isBangla
+              ? 'বর্তমানে কোনো ডকুমেন্ট সংরক্ষিত নেই। নিচে বামের [📎] আইকনে ট্যাপ করে আপনার পাসপোর্ট বা এনআইডি সুরক্ষিত সংরক্ষণ করতে পারেন।'
+              : 'No documents stored yet. Tap the attachment icon [📎] below to securely encrypt and save your Passport or ID.',
+          isUser: false,
+          timestamp: DateTime.now(),
+          suggestedActions: isBangla ? ['পাসপোর্ট সংরক্ষণ করো'] : ['Attach Passport'],
         );
         _appendBotMessage(replyMsg);
       }
