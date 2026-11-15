@@ -1,4 +1,5 @@
 import asyncio
+import base64
 from datetime import datetime, timezone
 import logging
 from typing import Optional
@@ -78,6 +79,16 @@ class ReminderScheduler:
                 logger.info(f"[ReminderScheduler] Found {len(due_reminders)} due reminder(s) to notify.")
 
                 for reminder in due_reminders:
+                    # Resolve clear reminder title from ciphertext
+                    reminder_title = "Scheduled Reminder"
+                    if reminder.ciphertext:
+                        try:
+                            decoded = base64.b64decode(reminder.ciphertext).decode("utf-8").strip()
+                            if decoded:
+                                reminder_title = decoded
+                        except Exception:
+                            pass
+
                     # 2. Fetch user's registered device tokens
                     token_stmt = select(DeviceToken.token).where(
                         DeviceToken.user_id == reminder.user_id
@@ -89,10 +100,11 @@ class ReminderScheduler:
                         for token in tokens:
                             await fcm_push_service.send_reminder_push(
                                 token=token,
-                                title="Pingo",
+                                title=reminder_title,
                                 body="You have a scheduled reminder right now.",
                                 data={
                                     "reminder_id": str(reminder.id),
+                                    "title": reminder_title,
                                     "due_at": reminder.due_at.isoformat() if reminder.due_at else "",
                                     "ciphertext": reminder.ciphertext,
                                     "iv": reminder.iv,
