@@ -53,12 +53,12 @@ class EncryptedReminderDto {
         'auth_tag': authTag,
         'key_version': keyVersion,
         'algorithm': algorithm,
-        'due_at': dueAt?.toIso8601String(),
+        'due_at': dueAt?.toUtc().toIso8601String(),
         'is_completed': isCompleted,
         'version': version,
-        'created_at': createdAt?.toIso8601String(),
-        'updated_at': updatedAt?.toIso8601String(),
-        'deleted_at': deletedAt?.toIso8601String(),
+        'created_at': createdAt?.toUtc().toIso8601String(),
+        'updated_at': updatedAt?.toUtc().toIso8601String(),
+        'deleted_at': deletedAt?.toUtc().toIso8601String(),
       };
 }
 

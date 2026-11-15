@@ -97,23 +97,27 @@ class FcmService {
 
       // 6. Foreground message listener (App is open on screen)
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-        debugPrint(
-            '[FcmService] Foreground message arrived: ${message.messageId}');
-        final notification = message.notification;
-        final data = message.data;
+        try {
+          debugPrint(
+              '[FcmService] Foreground message arrived: ${message.messageId}');
+          final notification = message.notification;
+          final data = message.data;
 
-        final String title = notification?.title ?? data['title'] ?? 'Pingo';
-        final String body = notification?.body ??
-            data['body'] ??
-            'You have a scheduled reminder right now.';
+          final String title = notification?.title ?? data['title'] ?? 'Pingo';
+          final String body = notification?.body ??
+              data['body'] ??
+              'You have a scheduled reminder right now.';
 
-        await NotificationService.instance.showPushNotification(
-          id: message.messageId?.hashCode ??
-              DateTime.now().millisecondsSinceEpoch,
-          title: title,
-          body: body,
-          payload: jsonEncode(data),
-        );
+          await NotificationService.instance.showPushNotification(
+            id: message.messageId?.hashCode ??
+                DateTime.now().millisecondsSinceEpoch,
+            title: title,
+            body: body,
+            payload: jsonEncode(data),
+          );
+        } catch (e, stack) {
+          debugPrint('[FcmService] Foreground push processing error: $e\n$stack');
+        }
       });
 
       // 7. Notification clicked while app was in background

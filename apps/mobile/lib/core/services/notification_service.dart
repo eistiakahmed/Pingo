@@ -369,10 +369,9 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.message,
+      category: AndroidNotificationCategory.reminder,
       ticker: title,
       styleInformation: styleInfo,
-      fullScreenIntent: true,
     );
 
     const darwinDetails = DarwinNotificationDetails(
@@ -387,13 +386,18 @@ class NotificationService {
       iOS: darwinDetails,
     );
 
-    await _notificationsPlugin.show(
-      safeId,
-      title,
-      body,
-      notificationDetails,
-      payload: payload,
-    );
+    try {
+      await _notificationsPlugin.show(
+        safeId,
+        title,
+        body,
+        notificationDetails,
+        payload: payload,
+      );
+      debugPrint('[NotificationService] Displayed push notification #$safeId: "$title"');
+    } catch (e) {
+      debugPrint('[NotificationService] Error displaying push notification: $e');
+    }
   }
 
   /// Cancels a scheduled notification by its ID.
