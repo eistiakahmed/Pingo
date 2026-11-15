@@ -1,5 +1,7 @@
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import get_settings
@@ -59,5 +61,42 @@ async def root():
         "docs": "/docs",
         "health": "/health",
         "api_v1": settings.API_V1_PREFIX,
+        "download": "/download",
     }
+
+
+# APK Web Distribution
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DOWNLOAD_HTML_PATH = os.path.join(BASE_DIR, "static", "download.html")
+APK_CANDIDATE_PATHS = [
+    "/app/downloads/app-release.apk",
+    os.path.join(BASE_DIR, "static", "app-release.apk"),
+    os.path.join(os.path.dirname(BASE_DIR), "downloads", "app-release.apk"),
+]
+
+
+@app.get("/download", response_class=HTMLResponse, tags=["Distribution"])
+@app.get("/download/", response_class=HTMLResponse, tags=["Distribution"])
+async def download_portal():
+    if os.path.exists(DOWNLOAD_HTML_PATH):
+        with open(DOWNLOAD_HTML_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(
+        content="<h2>Pingo APK Download portal is currently initializing...</h2>",
+        status_code=200,
+    )
+
+
+@app.get("/download/app-release.apk", tags=["Distribution"])
+@app.get("/app-release.apk", tags=["Distribution"])
+async def download_apk_binary():
+    for apk_path in APK_CANDIDATE_PATHS:
+        if os.path.exists(apk_path) and os.path.getsize(apk_path) > 1000000:
+            return FileResponse(
+                path=apk_path,
+                filename="pingo-release.apk",
+                media_type="application/vnd.android.package-archive",
+            )
+    raise HTTPException(status_code=404, detail="Pingo release APK binary not found on server")
+
 

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download Pingo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090D16;
+      --card-bg: #121826;
+      --card-border: #1E293B;
+      --orange: #FF5E1E;
+      --orange-hover: #E04E14;
+      --text-main: #FFFFFF;
+      --text-muted: #94A3B8;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+      background: radial-gradient(circle at 50% 20%, #162035 0%, var(--bg) 70%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 28px;
+      padding: 40px 32px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 80px rgba(255, 94, 30, 0.08);
+    }
+    .logo-badge {
+      width: 76px;
+      height: 76px;
+      background: rgba(255, 94, 30, 0.12);
+      border: 1.5px solid rgba(255, 94, 30, 0.35);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .logo-badge span {
+      font-size: 34px;
+      font-weight: 800;
+      color: var(--orange);
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.5;
+      margin-bottom: 32px;
+    }
+    .meta-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      font-size: 13.5px;
+      color: var(--text-muted);
+    }
+    .meta-box strong {
+      color: var(--text-main);
+    }
+    .download-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: linear-gradient(135deg, var(--orange) 0%, #FF773D 100%);
+      color: #FFFFFF;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 16px 24px;
+      border-radius: 18px;
+      transition: all 0.2s ease;
+      box-shadow: 0 10px 25px rgba(255, 94, 30, 0.35);
+    }
+    .download-btn:active {
+      transform: scale(0.98);
+      background: var(--orange-hover);
+    }
+    .instructions {
+      margin-top: 24px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-badge">
+      <span>P</span>
+    </div>
+    <h1>Pingo for Android</h1>
+    <p class="subtitle">Smart Memory Assistant for Reminders, Voice Notes, and Documents</p>
+    
+    <div class="meta-box">
+      <span>Version: <strong>1.0.0 (Release)</strong></span>
+      <span>Size: <strong>55 MB</strong></span>
+    </div>
+
+    <a href="/download/app-release.apk" class="download-btn" download="pingo-release.apk">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      Download APK
+    </a>
+
+    <div class="instructions">
+      After downloading, tap the file in your notification bar or Downloads folder to install.
+    </div>
+  </div>
+</body>
+</html>

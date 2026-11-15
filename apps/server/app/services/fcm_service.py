@@ -2,8 +2,15 @@ import json
 import logging
 import os
 from typing import Optional
-import firebase_admin
-from firebase_admin import credentials, messaging
+try:
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+    HAS_FIREBASE = True
+except ImportError:
+    firebase_admin = None
+    credentials = None
+    messaging = None
+    HAS_FIREBASE = False
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +26,10 @@ class FcmPushService:
 
     def initialize(self) -> bool:
         """Initializes the Firebase Admin SDK singleton using service account credentials."""
+        if not HAS_FIREBASE:
+            logger.warning("[FcmPushService] firebase-admin package is not installed. Push notifications disabled.")
+            return False
+
         if self._initialized:
             return True
 
