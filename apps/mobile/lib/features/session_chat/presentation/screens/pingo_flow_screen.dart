@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:pingo_mobile/core/network/providers.dart';
+import 'package:pingo_mobile/core/services/fcm_service.dart';
 import 'package:pingo_mobile/core/services/notification_service.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
 import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
@@ -84,6 +85,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         lowerPrompt.contains('চেক') ||
         lowerPrompt.contains('check alert')) {
       await NotificationService.instance.showInstantTestNotification();
+      FcmService.instance.triggerBackendTestPush();
       final isPermitted =
           await NotificationService.instance.areNotificationsEnabled();
       if (mounted) {
@@ -431,6 +433,7 @@ class _PingoFlowScreenState extends ConsumerState<PingoFlowScreen> {
         title: 'Pingo Test Alert',
         body: 'Alarms and notifications are active and punctually working.',
       );
+      FcmService.instance.triggerBackendTestPush();
       final isPermitted =
           await NotificationService.instance.areNotificationsEnabled();
       final isExactAllowed =

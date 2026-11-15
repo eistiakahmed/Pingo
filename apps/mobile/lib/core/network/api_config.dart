@@ -33,5 +33,6 @@ class ApiConfig {
   static String get syncPush => '$baseUrl$prefixV1/sync/push';
   static String get syncPull => '$baseUrl$prefixV1/sync/pull';
   static String get registerDeviceToken => '$baseUrl$prefixV1/devices/register-token';
+  static String get testPush => '$baseUrl$prefixV1/devices/test-push';
 }
 

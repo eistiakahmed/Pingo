@@ -93,10 +93,9 @@ class FcmPushService:
                     priority="high",
                     notification=messaging.AndroidNotification(
                         channel_id="pingo_urgent_channel_v2",
-                        sound="default",
-                        priority="max",
                         default_sound=True,
                         default_vibrate_timings=True,
+                        click_action="FLUTTER_NOTIFICATION_CLICK",
                     ),
                 ),
             )

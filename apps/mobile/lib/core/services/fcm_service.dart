@@ -187,4 +187,41 @@ class FcmService {
       return false;
     }
   }
+
+  /// Dispatches a real-time test push notification from the FastAPI backend to this device.
+  Future<bool> triggerBackendTestPush() async {
+    try {
+      final token = _fcmToken ?? await FirebaseMessaging.instance.getToken();
+      if (token == null) return false;
+      final authToken = await LocalStorageService.instance.getAuthToken();
+      final url = Uri.parse(ApiConfig.testPush);
+
+      final headers = <String, String>{
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json',
+      };
+      if (authToken != null && authToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $authToken';
+      }
+
+      final response = await http
+          .post(
+            url,
+            headers: headers,
+            body: jsonEncode({
+              'token': token,
+              'title': 'Pingo Test Alert',
+              'body': 'Backend push notification is working perfectly!',
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      debugPrint(
+          '[FcmService] Backend test push response: ${response.statusCode} - ${response.body}');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FcmService] Backend test push request failed: $e');
+      return false;
+    }
+  }
 }

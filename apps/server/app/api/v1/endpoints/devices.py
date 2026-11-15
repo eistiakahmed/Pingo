@@ -7,7 +7,13 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.device_token import DeviceToken
 from app.models.user import User
-from app.schemas.device import DeviceTokenRegisterRequest, DeviceTokenResponse
+from app.schemas.device import (
+    DeviceTokenRegisterRequest,
+    DeviceTokenResponse,
+    TestPushRequest,
+    TestPushResponse,
+)
+from app.services.fcm_service import fcm_push_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -54,4 +60,56 @@ async def register_device_token(
     return DeviceTokenResponse(
         status="success",
         message="Device token registered successfully",
+    )
+
+
+@router.post(
+    "/test-push",
+    response_model=TestPushResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Dispatch a test push notification to user device(s)",
+    tags=["Devices"],
+)
+async def test_push_notification(
+    request: TestPushRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TestPushResponse:
+    """Dispatches a test high-priority FCM notification to verified device token(s)."""
+    targets = []
+    if request.token:
+        targets.append(request.token)
+    else:
+        stmt = select(DeviceToken.token).where(DeviceToken.user_id == current_user.id)
+        result = await db.execute(stmt)
+        targets = list(result.scalars().all())
+
+    if not targets:
+        return TestPushResponse(
+            status="warning",
+            message="No device tokens found for this user. Please register a device token first.",
+            sent_count=0,
+            details=[],
+        )
+
+    sent_count = 0
+    details = []
+    for token in targets:
+        success = await fcm_push_service.send_reminder_push(
+            token=token,
+            title=request.title,
+            body=request.body,
+            data={"type": "test_alert", "timestamp": datetime.now(timezone.utc).isoformat()},
+        )
+        if success:
+            sent_count += 1
+            details.append({"token": token[:15] + "...", "status": "delivered"})
+        else:
+            details.append({"token": token[:15] + "...", "status": "failed"})
+
+    return TestPushResponse(
+        status="success" if sent_count > 0 else "error",
+        message=f"Dispatched test push to {sent_count} of {len(targets)} device(s).",
+        sent_count=sent_count,
+        details=details,
     )
