@@ -19,6 +19,15 @@ class ReminderPriority(str, enum.Enum):
     URGENT = "URGENT"
 
 
+class ParseIntent(str, enum.Enum):
+    """Single intent the parser may return. 'set an alarm' == 'set a reminder'."""
+    CREATE_REMINDER = "create_reminder"
+    LIST_REMINDERS = "list_reminders"
+    DELETE_REMINDER = "delete_reminder"
+    UPDATE_REMINDER = "update_reminder"
+    CHAT = "chat"
+
+
 class ParseReminderRequest(BaseModel):
     text: str = Field(
         min_length=1,
@@ -36,10 +45,33 @@ class ParseReminderRequest(BaseModel):
 
 
 class ParsedReminderData(BaseModel):
-    title: str = Field(description="Actionable, concise title of the reminder")
+    """Parser output. date/time are the model's structured fields (user's words kept);
+    due_at is computed server-side by deterministic resolver logic, never by the model."""
+    intent: ParseIntent = Field(
+        default=ParseIntent.CREATE_REMINDER,
+        description="create_reminder | list_reminders | delete_reminder | update_reminder | chat",
+    )
+    title: Optional[str] = Field(
+        default=None,
+        description="Title built from the user's own words, never corrected or translated",
+    )
+    date: Optional[str] = Field(
+        default=None,
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="Resolved date, YYYY-MM-DD in the user's local timezone",
+    )
+    time: Optional[str] = Field(
+        default=None,
+        pattern=r"^\d{2}:\d{2}$",
+        description="Resolved 24-hour time, HH:MM local",
+    )
+    clarifying_question: Optional[str] = Field(
+        default=None,
+        description="Exactly one short follow-up question when time/date is unclear; otherwise null",
+    )
     due_at: Optional[datetime] = Field(
         default=None,
-        description="Resolved ISO 8601 UTC timestamp for when the reminder is due",
+        description="Resolved ISO 8601 UTC timestamp (server-computed from date+time+timezone)",
     )
     category: ReminderCategory = Field(
         default=ReminderCategory.GENERAL,

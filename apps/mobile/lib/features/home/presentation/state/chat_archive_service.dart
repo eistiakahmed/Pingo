@@ -98,6 +98,16 @@ class ChatArchiveService {
     }
   }
 
+  /// Clears only the active conversation window.
+  /// Chat history is intentionally not persisted between launches;
+  /// saved reminders live in HomeReminderNotifier and are unaffected.
+  Future<void> clearActiveMessages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_activeMessagesKey);
+    } catch (_) {}
+  }
+
   /// Clears active and archived messages.
   Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();

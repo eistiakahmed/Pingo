@@ -18,6 +18,13 @@ class ChatMessage {
   final String? documentCategory;
   final String? documentExpiry;
   final String? documentIdentifier;
+  final String? filePath;
+  final int? fileSize;
+
+  // Confirmation gate for zero false-alarm reminders
+  final bool isPendingConfirmation;
+  final String? pendingReminderCategory;
+  final String? pendingReminderPriority;
 
   const ChatMessage({
     required this.id,
@@ -33,9 +40,15 @@ class ChatMessage {
     this.documentCategory,
     this.documentExpiry,
     this.documentIdentifier,
+    this.filePath,
+    this.fileSize,
+    this.isPendingConfirmation = false,
+    this.pendingReminderCategory,
+    this.pendingReminderPriority,
   });
 
   bool get hasReminder => reminderTitle != null && reminderDueAt != null;
+  bool get hasPendingReminder => isPendingConfirmation && hasReminder;
   bool get hasDocument => documentTitle != null && documentTitle!.isNotEmpty;
 
   ChatMessage copyWith({
@@ -52,6 +65,11 @@ class ChatMessage {
     String? documentCategory,
     String? documentExpiry,
     String? documentIdentifier,
+    String? filePath,
+    int? fileSize,
+    bool? isPendingConfirmation,
+    String? pendingReminderCategory,
+    String? pendingReminderPriority,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -67,6 +85,11 @@ class ChatMessage {
       documentCategory: documentCategory ?? this.documentCategory,
       documentExpiry: documentExpiry ?? this.documentExpiry,
       documentIdentifier: documentIdentifier ?? this.documentIdentifier,
+      filePath: filePath ?? this.filePath,
+      fileSize: fileSize ?? this.fileSize,
+      isPendingConfirmation: isPendingConfirmation ?? this.isPendingConfirmation,
+      pendingReminderCategory: pendingReminderCategory ?? this.pendingReminderCategory,
+      pendingReminderPriority: pendingReminderPriority ?? this.pendingReminderPriority,
     );
   }
 
@@ -85,6 +108,11 @@ class ChatMessage {
       'documentCategory': documentCategory,
       'documentExpiry': documentExpiry,
       'documentIdentifier': documentIdentifier,
+      'filePath': filePath,
+      'fileSize': fileSize,
+      'isPendingConfirmation': isPendingConfirmation,
+      'pendingReminderCategory': pendingReminderCategory,
+      'pendingReminderPriority': pendingReminderPriority,
     };
   }
 
@@ -108,6 +136,11 @@ class ChatMessage {
       documentCategory: map['documentCategory'] as String?,
       documentExpiry: map['documentExpiry'] as String?,
       documentIdentifier: map['documentIdentifier'] as String?,
+      filePath: map['filePath'] as String?,
+      fileSize: map['fileSize'] as int?,
+      isPendingConfirmation: map['isPendingConfirmation'] as bool? ?? false,
+      pendingReminderCategory: map['pendingReminderCategory'] as String?,
+      pendingReminderPriority: map['pendingReminderPriority'] as String?,
     );
   }
 

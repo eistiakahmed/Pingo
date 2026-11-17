@@ -86,13 +86,16 @@ class VoiceRecognitionService {
             onResult(result.recognizedWords);
           }
         },
-        localeId: localeId,
-        listenFor: const Duration(minutes: 5),
-        pauseFor: const Duration(seconds: 10),
-        partialResults: true,
+        listenOptions: stt.SpeechListenOptions(
+          // Forward the requested locale ('bn_BD' / 'en_US') so the
+          // Bangla/English toggle actually drives recognition. A null value
+          // keeps the engine default.
+          localeId: localeId,
+          listenMode: stt.ListenMode.dictation,
+          cancelOnError: false,
+          partialResults: true,
+        ),
         onSoundLevelChange: onSoundLevelChange,
-        cancelOnError: false,
-        listenMode: stt.ListenMode.dictation,
       );
     } catch (e) {
       debugPrint('[VoiceRecognition] Error starting listen: $e');

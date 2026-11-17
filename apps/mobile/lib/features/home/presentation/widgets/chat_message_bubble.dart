@@ -2,79 +2,112 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../domain/chat_message.dart';
 
-/// Rounded message bubble featuring soft gradients for user utterances
-/// and frosted glass containers for Pingo assistant responses with embedded task cards.
+/// WhatsApp-style message bubbles: compact user bubbles (kept blue gradient),
+/// tidy assistant bubbles, a SMALL confirmation bubble for reminders
+/// ("Reminder set: Title, 12:00 AM, Nov 18" built from structured fields —
+/// never free-form AI prose), and tappable encrypted document cards.
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
-  final Function(String action)? onActionSelected;
+  final bool isBangla;
+  final VoidCallback? onConfirmReminder;
+  final VoidCallback? onDiscardReminder;
+  final VoidCallback? onSetExpiryAlert;
 
   const ChatMessageBubble({
     super.key,
     required this.message,
-    this.onActionSelected,
+    this.isBangla = false,
+    this.onConfirmReminder,
+    this.onDiscardReminder,
+    this.onSetExpiryAlert,
   });
+
+  static const _userGradient = LinearGradient(
+    colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  String get _timeStr => DateFormat.jm().format(message.timestamp);
+
+  String get _dueStr {
+    final d = message.reminderDueAt!;
+    return '${DateFormat.jm().format(d)}, ${DateFormat.MMMd().format(d)}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (message.isUser) {
-      return _buildUserBubble(context);
-    } else {
-      return _buildAssistantBubble(context);
-    }
+    if (message.isUser) return _buildUserBubble(context);
+    return _buildAssistantBubble(context);
   }
 
-  Widget _buildUserBubble(BuildContext context) {
-    final timeStr = DateFormat.jm().format(message.timestamp);
+  // ───────────────────────────── USER ─────────────────────────────
 
+  Widget _buildUserBubble(BuildContext context) {
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.78,
         ),
-        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 12),
+        padding: const EdgeInsets.only(
+          left: 14,
+          right: 12,
+          top: 8,
+          bottom: 6,
+        ),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFF2563EB), // Electric Royal Blue
-              Color(0xFF1D4ED8), // Deep Glacier Blue
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          gradient: _userGradient,
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-            bottomLeft: Radius.circular(20),
+            topLeft: Radius.circular(18),
+            topRight: Radius.circular(18),
+            bottomLeft: Radius.circular(18),
             bottomRight: Radius.circular(4),
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF1D4ED8).withValues(alpha: 0.28),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: const Color(0xFF1D4ED8).withValues(alpha: 0.18),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Stack(
           children: [
-            Text(
-              message.text,
-              style: const TextStyle(
-                fontSize: 15,
-                color: Colors.white,
-                height: 1.35,
-                fontWeight: FontWeight.w400,
+            // Reserve space on the last line for the inline timestamp,
+            // WhatsApp-style: the time sits inside the bubble bottom-right.
+            Padding(
+              padding: const EdgeInsets.only(right: 46),
+              child: Text(
+                message.text,
+                style: const TextStyle(
+                  fontSize: 15.5,
+                  color: Colors.white,
+                  height: 1.45, // Bangla-safe line height
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              timeStr,
-              style: TextStyle(
-                fontSize: 10.5,
-                color: Colors.white.withValues(alpha: 0.65),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _timeStr,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Icon(
+                    Icons.done_all_rounded,
+                    size: 13,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                ],
               ),
             ),
           ],
@@ -83,8 +116,18 @@ class ChatMessageBubble extends StatelessWidget {
     );
   }
 
+  // ─────────────────────────── ASSISTANT ───────────────────────────
+
   Widget _buildAssistantBubble(BuildContext context) {
-    final timeStr = DateFormat.jm().format(message.timestamp);
+    const bubbleBg = Color(0xFF1B2436);
+    const bubbleBorder = Color(0xFF253048);
+    const textColor = Color(0xFFF1F5F9);
+
+    // Nothing to render (e.g. fully discarded proposal) — skip silently.
+    final isEmptyBody = message.text.isEmpty &&
+        !message.hasReminder &&
+        !message.hasDocument;
+    if (isEmptyBody) return const SizedBox.shrink();
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -92,312 +135,275 @@ class ChatMessageBubble extends StatelessWidget {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.84,
         ),
-        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Mini Penguin Avatar
-            Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(top: 2, right: 8),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF1E293B),
-                border: Border.all(color: const Color(0xFF334155), width: 1),
+        margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+          decoration: BoxDecoration(
+            color: bubbleBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(4),
+              topRight: Radius.circular(18),
+              bottomLeft: Radius.circular(18),
+              bottomRight: Radius.circular(18),
+            ),
+            border: Border.all(color: bubbleBorder, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (message.text.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(right: 44),
+                  child: Text(
+                    message.text,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: textColor,
+                      height: 1.45, // Bangla-safe line height
+                    ),
+                  ),
+                ),
+
+              // Pending proposal → compact confirm bubble with inline ✓ / ✗
+              if (message.hasPendingReminder) ...[
+                const SizedBox(height: 6),
+                _buildCompactPendingRow(),
+              ]
+              // Confirmed reminder → one small tidy confirmation bubble
+              else if (message.hasReminder) ...[
+                const SizedBox(height: 6),
+                _buildCompactReminderSetRow(),
+              ],
+
+              // Encrypted document card (tap to configure expiry alert)
+              if (message.hasDocument) ...[
+                const SizedBox(height: 6),
+                _buildDocumentCard(),
+              ],
+
+              const SizedBox(height: 3),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  _timeStr,
+                  style:
+                      const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                ),
               ),
-              child: const Center(
-                child: Text('🐧', style: TextStyle(fontSize: 14)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Small, tidy confirmation: "Reminder set: Title, 12:00 AM, Nov 18".
+  /// Time and date live inside the bubble, small — built from structured
+  /// fields in app code, so it can never contain AI spelling mistakes.
+  Widget _buildCompactReminderSetRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF102A1E),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF14532D), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.alarm_rounded,
+            size: 17,
+            color: Color(0xFF10B981),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: isBangla ? 'রিমাইন্ডার সেট হয়েছে: ' : 'Reminder set: ',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF6EE7B7),
+                    ),
+                  ),
+                  TextSpan(
+                    text: message.reminderTitle!,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFF8FAFC),
+                    ),
+                  ),
+                  TextSpan(
+                    text: '\n$_dueStr',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            // Message Container
-            Flexible(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF131B2A),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(4),
-                    topRight: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
+  /// Pending proposal: same compact shape, amber, with tiny inline actions.
+  /// The zero-false-alarm gate is preserved: no alarm exists until confirmed.
+  Widget _buildCompactPendingRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A1F0E),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF78350F), width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.schedule_rounded,
+            size: 17,
+            color: Color(0xFFF59E0B),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: isBangla ? 'রিমাইন্ডার সেট করবেন? ' : 'Set reminder? ',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFFCD34D),
+                    ),
                   ),
-                  border: Border.all(color: const Color(0xFF1D263B), width: 1.1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
+                  TextSpan(
+                    text: message.reminderTitle!,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFF8FAFC),
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      message.text,
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        color: Color(0xFFF1F5F9),
-                        height: 1.4,
-                        fontWeight: FontWeight.w400,
-                      ),
+                  ),
+                  TextSpan(
+                    text: '\n$_dueStr',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF94A3B8),
                     ),
-
-                    // Embedded Task Card (if reminder created)
-                    if (message.hasReminder) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF334155), width: 1),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 7,
-                                  height: 7,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Color(0xFF10B981),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'SCHEDULED ALARM',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    letterSpacing: 1.0,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF10B981),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              message.reminderTitle!,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.access_time_rounded,
-                                  size: 14,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  DateFormat.jm().format(message.reminderDueAt!),
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    color: Color(0xFFE2E8F0),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                const Icon(
-                                  Icons.calendar_today_rounded,
-                                  size: 13,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  DateFormat.MMMd().format(message.reminderDueAt!),
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    color: Color(0xFF94A3B8),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    // Embedded Encrypted Document Card
-                    if (message.hasDocument) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(13),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0D1424),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 7,
-                                      height: 7,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Color(0xFF38BDF8),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Text(
-                                      'ENCRYPTED DOCUMENT',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        letterSpacing: 1.0,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF38BDF8),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1E293B),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'AES-256',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF94A3B8),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1E293B),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFF334155), width: 1),
-                                  ),
-                                  child: const Icon(
-                                    Icons.description_outlined,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        message.documentTitle!,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      if (message.documentCategory != null) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          message.documentCategory!,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF94A3B8),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (message.documentExpiry != null) ...[
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Icon(Icons.event_outlined, size: 13, color: Color(0xFFF59E0B)),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    'Expires: ${message.documentExpiry!}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFFF59E0B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    // Action buttons (e.g. Reschedule / Cancel)
-                    if (message.suggestedActions.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: message.suggestedActions.map((action) {
-                          return InkWell(
-                            onTap: () {
-                              if (onActionSelected != null) {
-                                onActionSelected!(action);
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1E293B),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFF334155), width: 1),
-                              ),
-                              child: Text(
-                                action,
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF38BDF8),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        timeStr,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Tiny inline confirm / discard actions
+          InkWell(
+            onTap: onConfirmReminder,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF10B981),
+              ),
+              child: const Icon(Icons.check_rounded,
+                  size: 15, color: Colors.white),
+            ),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: onDiscardReminder,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFEF4444), width: 1.2),
+              ),
+              child: const Icon(Icons.close_rounded,
+                  size: 15, color: Color(0xFFEF4444)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Compact encrypted document card. The always-visible "Set Expiry Alert"
+  /// button was removed from the chat per spec — the whole card is now
+  /// tappable to configure the expiry alert.
+  Widget _buildDocumentCard() {
+    final fileSizeText = message.fileSize != null
+        ? '${(message.fileSize! / 1024).toStringAsFixed(1)} KB'
+        : 'AES-256';
+
+    return InkWell(
+      onTap: onSetExpiryAlert,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F1B2E),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF1E3A5F), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFF16283F),
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: const Color(0xFF25405F), width: 1),
+              ),
+              child: const Icon(
+                Icons.description_outlined,
+                color: Color(0xFF38BDF8),
+                size: 19,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.documentTitle!,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFF8FAFC),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    isBangla
+                        ? 'ট্যাপ করে মেয়াদ এলার্ট সেট করুন · $fileSizeText'
+                        : 'Tap to set expiry alert · $fileSizeText',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: Color(0xFF64748B),
             ),
           ],
         ),

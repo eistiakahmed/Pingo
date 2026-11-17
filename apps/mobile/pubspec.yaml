@@ -27,6 +27,7 @@ dependencies:
   # Utilities
   uuid: ^4.4.0
   speech_to_text: ^7.5.0
+  file_picker: ^8.0.0
   flutter_local_notifications: ^17.2.3
   timezone: ^0.9.4
   shared_preferences: ^2.2.3

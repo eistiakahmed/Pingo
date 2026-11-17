@@ -31,7 +31,15 @@ class Settings(BaseSettings):
     # AI Configuration
     AI_PROVIDER: str = Field(
         default="deepseek",
-        description="Active AI Provider: 'deepseek' or 'gemini'",
+        description="Active AI Provider: 'deepseek' (default), 'anthropic', or 'gemini'",
+    )
+    ANTHROPIC_API_KEY: str = Field(
+        default="",
+        description="Anthropic API key for natural language reminder parsing (server-side only)",
+    )
+    ANTHROPIC_MODEL: str = Field(
+        default="claude-haiku-5-5",
+        description="Anthropic model for parsing (Haiku class: cheap, fast, structured extraction)",
     )
     DEEPSEEK_API_KEY: str = Field(
         default="",

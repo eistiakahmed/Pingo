@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:pingo_mobile/core/crypto/crypto_helper.dart';
 import 'package:pingo_mobile/core/network/providers.dart';
 import 'package:pingo_mobile/core/services/fcm_service.dart';
@@ -124,10 +125,12 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
       reminders: [...state.reminders, item],
     );
     if (!item.isDone) {
+      final timeStr = DateFormat.jm().format(item.dueAt);
+      final dateStr = DateFormat.MMMd().format(item.dueAt);
       NotificationService.instance.scheduleReminder(
         id: item.id.hashCode,
         title: item.title,
-        body: 'Scheduled alert from Pingo',
+        body: '⏰ $timeStr · $dateStr',
         scheduledDate: item.dueAt,
         isUrgent: item.category == ReminderCategory.medicine ||
             item.priority == ReminderPriority.important,
@@ -143,10 +146,12 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
           state.reminders.map((r) => r.id == item.id ? item : r).toList(),
     );
     if (!item.isDone) {
+      final timeStr = DateFormat.jm().format(item.dueAt);
+      final dateStr = DateFormat.MMMd().format(item.dueAt);
       NotificationService.instance.scheduleReminder(
         id: item.id.hashCode,
         title: item.title,
-        body: 'Scheduled alert from Pingo',
+        body: '⏰ $timeStr · $dateStr',
         scheduledDate: item.dueAt,
         isUrgent: item.category == ReminderCategory.medicine ||
             item.priority == ReminderPriority.important,
@@ -166,10 +171,12 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
             dueAt: r.dueAt.add(duration),
             isOverdue: false,
           );
+          final timeStr = DateFormat.jm().format(updated.dueAt);
+          final dateStr = DateFormat.MMMd().format(updated.dueAt);
           NotificationService.instance.scheduleReminder(
             id: updated.id.hashCode,
             title: updated.title,
-            body: 'Snoozed reminder from Pingo',
+            body: '⏰ $timeStr · $dateStr (Snoozed)',
             scheduledDate: updated.dueAt,
           );
           return updated;
@@ -189,10 +196,12 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
           if (newDone) {
             NotificationService.instance.cancelReminder(r.id.hashCode);
           } else {
+            final timeStr = DateFormat.jm().format(r.dueAt);
+            final dateStr = DateFormat.MMMd().format(r.dueAt);
             NotificationService.instance.scheduleReminder(
               id: r.id.hashCode,
               title: r.title,
-              body: 'Active reminder from Pingo',
+              body: '⏰ $timeStr · $dateStr',
               scheduledDate: r.dueAt,
             );
           }

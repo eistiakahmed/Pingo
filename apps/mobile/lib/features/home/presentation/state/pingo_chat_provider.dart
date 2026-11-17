@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/network/providers.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import '../../../action_stream/domain/ai_models.dart';
 import '../../../../core/services/fcm_service.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/voice_recognition_service.dart';
 import '../../domain/chat_message.dart';
 import '../../domain/reminder_item.dart';
 import 'chat_archive_service.dart';
@@ -42,13 +46,24 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
 
   PingoChatNotifier(this._ref)
       : super(PingoChatState(sessionId: const Uuid().v4())) {
-    _loadInitialMessages();
+    // Fresh start on every launch: the chat screen is intentionally empty.
+    // Saved reminders live in HomeReminderNotifier + local storage and are untouched.
+    ChatArchiveService.instance.clearActiveMessages();
+    _loadDeviceTimezone();
   }
 
-  Future<void> _loadInitialMessages() async {
-    final active = await ChatArchiveService.instance.loadActiveMessages();
-    if (active.isNotEmpty) {
-      state = state.copyWith(messages: active);
+  /// Device IANA timezone (e.g. 'Asia/Dhaka') sent with every parse request
+  /// so the backend can resolve "in five minutes" / "kal bikel 5tay" locally.
+  String _deviceTimezone = 'Asia/Dhaka';
+
+  Future<void> _loadDeviceTimezone() async {
+    try {
+      final tzInfo = await FlutterTimezone.getLocalTimezone();
+      if (tzInfo.identifier.isNotEmpty) {
+        _deviceTimezone = tzInfo.identifier;
+      }
+    } catch (e) {
+      debugPrint('[PingoChat] Timezone lookup failed, keeping Asia/Dhaka: $e');
     }
   }
 
@@ -57,42 +72,52 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
     state = state.copyWith(language: lang);
   }
 
-  /// Archives the current conversation thread to persistent storage and starts a clean session.
-  Future<void> startNewSession() async {
-    await ChatArchiveService.instance.archiveCurrentSession(state.messages);
+  /// Suspends ongoing voice capture and resets background timers to prevent battery drain and notification loops.
+  void suspendServices() {
+    debugPrint('[PingoChat] Suspending voice and background services...');
+    VoiceRecognitionService.instance.cancelListening();
+  }
+
+  /// 'New chat' menu action: clears the on-screen conversation.
+  /// Chat history is not stored between launches; saved reminders are untouched.
+  void startNewChat() {
     state = state.copyWith(
       messages: [],
       sessionId: const Uuid().v4(),
       isThinking: false,
     );
+    ChatArchiveService.instance.clearActiveMessages();
   }
 
-  /// Attaches and securely stores an encrypted document directly inside the conversational flow.
-  Future<void> attachDocument({
-    required String title,
-    required String category,
-    String? expiry,
+  /// Attaches a native file picked by the user and securely integrates it into conversational memory.
+  Future<void> attachNativeFile({
+    required String name,
+    required String? path,
+    required int size,
   }) async {
     final isBangla = state.language == 'bn';
 
     final userAttachmentMsg = ChatMessage(
       id: const Uuid().v4(),
-      text: isBangla ? 'ডকুমেন্ট সংযুক্ত করা হলো: $title' : 'Attached document: $title',
+      text: isBangla ? 'ডকুমেন্ট সংযুক্ত করা হলো: $name' : 'Attached document: $name',
       isUser: true,
       timestamp: DateTime.now(),
+      documentTitle: name,
+      filePath: path,
+      fileSize: size,
     );
 
     final botConfirmationMsg = ChatMessage(
       id: const Uuid().v4(),
       text: isBangla
-          ? 'ডকুমেন্টটি সফলভাবে এনক্রিপ্ট করে আপনার মেমোরিতে সংরক্ষণ করা হয়েছে।'
-          : 'Document securely encrypted and stored in your conversational memory.',
+          ? 'ডকুমেন্ট এনক্রিপ্ট করে সংরক্ষণ করা হয়েছে। মেয়াদ এলার্ট সেট করতে কার্ডে ট্যাপ করুন।'
+          : 'Document encrypted and stored. Tap the card to set an expiry alert.',
       isUser: false,
       timestamp: DateTime.now(),
-      documentTitle: title,
-      documentCategory: category,
-      documentExpiry: expiry ?? 'Dec 2029',
-      suggestedActions: isBangla ? ['মেয়াদ এলার্ট সেট করো'] : ['Set Expiry Alert'],
+      documentTitle: name,
+      documentCategory: _inferCategoryFromFilename(name),
+      filePath: path,
+      fileSize: size,
     );
 
     final nextList = [...state.messages, userAttachmentMsg, botConfirmationMsg];
@@ -100,7 +125,104 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
     await ChatArchiveService.instance.saveActiveMessages(nextList);
   }
 
-  /// Sends a message and orchestrates AI parsing, reminders, and punctual notification scheduling.
+  /// Sets an expiry reminder alert for an attached document.
+  Future<void> setDocumentExpiryReminder({
+    required String documentTitle,
+    required DateTime expiryDate,
+  }) async {
+    final isBangla = state.language == 'bn';
+    final reminderId = const Uuid().v4();
+    final reminderTitle = isBangla
+        ? 'ডকুমেন্টের মেয়াদ উত্তীর্ণ: $documentTitle'
+        : 'Document Expiry: $documentTitle';
+
+    final reminderItem = ReminderItem(
+      id: reminderId,
+      title: reminderTitle,
+      dueAt: expiryDate,
+      category: ReminderCategory.bill,
+      priority: ReminderPriority.important,
+    );
+
+    // Register alarm directly on user-confirmed date picker
+    _ref.read(homeReminderProvider.notifier).addReminder(reminderItem);
+
+    final replyMsg = ChatMessage(
+      id: const Uuid().v4(),
+      // Compact confirmation: the bubble renders 'Reminder set: title, time · date'
+      // directly from these fields, so no free-form prose is needed.
+      text: '',
+      isUser: false,
+      timestamp: DateTime.now(),
+      reminderId: reminderId,
+      reminderTitle: reminderTitle,
+      reminderDueAt: expiryDate,
+    );
+
+    _appendBotMessage(replyMsg);
+  }
+
+  /// Mandatory Confirmation: Explicitly schedules the proposed reminder into system alarms.
+  Future<void> confirmReminder(String messageId) async {
+    final index = state.messages.indexWhere((m) => m.id == messageId);
+    if (index == -1) return;
+
+    final targetMsg = state.messages[index];
+    if (targetMsg.reminderTitle == null || targetMsg.reminderDueAt == null) return;
+
+    final reminderId = const Uuid().v4();
+    final reminderItem = ReminderItem(
+      id: reminderId,
+      title: targetMsg.reminderTitle!,
+      dueAt: targetMsg.reminderDueAt!,
+      category: _mapAiCategory(targetMsg.pendingReminderCategory),
+      priority: targetMsg.pendingReminderPriority == 'HIGH' ||
+              targetMsg.pendingReminderPriority == 'URGENT'
+          ? ReminderPriority.important
+          : ReminderPriority.normal,
+    );
+
+    // Commit to the reminder engine & register exact alarm
+    _ref.read(homeReminderProvider.notifier).addReminder(reminderItem);
+
+    // Update the message state from pending to confirmed (compact confirmation bubble)
+    final updatedMsg = targetMsg.copyWith(
+      isPendingConfirmation: false,
+      reminderId: reminderId,
+      text: '',
+      suggestedActions: const [],
+    );
+
+    final updatedList = List<ChatMessage>.from(state.messages);
+    updatedList[index] = updatedMsg;
+    state = state.copyWith(messages: updatedList);
+    await ChatArchiveService.instance.saveActiveMessages(updatedList);
+  }
+
+  /// Discards a proposed reminder without scheduling any alarm.
+  Future<void> discardReminder(String messageId) async {
+    final isBangla = state.language == 'bn';
+    final index = state.messages.indexWhere((m) => m.id == messageId);
+    if (index == -1) return;
+
+    final targetMsg = state.messages[index];
+    final updatedMsg = targetMsg.copyWith(
+      isPendingConfirmation: false,
+      reminderTitle: null,
+      reminderDueAt: null,
+      text: isBangla
+          ? 'প্রস্তাবিত রিমাইন্ডারটি বাতিল করা হয়েছে।'
+          : 'Proposed reminder discarded.',
+      suggestedActions: [],
+    );
+
+    final updatedList = List<ChatMessage>.from(state.messages);
+    updatedList[index] = updatedMsg;
+    state = state.copyWith(messages: updatedList);
+    await ChatArchiveService.instance.saveActiveMessages(updatedList);
+  }
+
+  /// Sends a message and orchestrates intent filtering, conversational commentary, and mandatory confirmation reminder proposals.
   Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
@@ -145,194 +267,265 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
       return;
     }
 
-    // 2. Cancellation Command
-    if (lower.contains('cancel') ||
-        lower.contains('বাতিল') ||
-        lower.contains('ক্যান্সেল') ||
-        lower.contains('মুছে')) {
-      final reminders = _ref.read(homeReminderProvider).reminders;
-      if (reminders.isNotEmpty) {
-        final toDelete = reminders.first;
-        _ref.read(homeReminderProvider.notifier).deleteReminder(toDelete.id);
-
-        final replyMsg = ChatMessage(
-          id: const Uuid().v4(),
-          text: isBangla
-              ? 'আপনার সর্বশেষ রিমাইন্ডার "${toDelete.title}" বাতিল করা হয়েছে।'
-              : 'Cancelled your latest reminder: "${toDelete.title}".',
-          isUser: false,
-          timestamp: DateTime.now(),
-        );
-        _appendBotMessage(replyMsg);
-      } else {
-        final replyMsg = ChatMessage(
-          id: const Uuid().v4(),
-          text: isBangla ? 'বাতিল করার মতো কোনো রিমাইন্ডার পাওয়া যায়নি।' : 'No active reminders found to cancel.',
-          isUser: false,
-          timestamp: DateTime.now(),
-        );
-        _appendBotMessage(replyMsg);
-      }
+    // 2. Conversational pre-filter: greetings handled locally, no API call
+    if (_isConversationalCommentary(lower)) {
+      _appendBotMessage(_botMsg(_generateConversationalResponse(lower, isBangla)));
       return;
     }
 
-    // 3. Schedule / Agenda Query Command
-    if (lower.contains('schedule') ||
-        lower.contains('task') ||
-        lower.contains('শিডিউল') ||
-        lower.contains('কাজ') ||
-        lower.contains('আজকে') ||
-        lower.contains('today')) {
-      final reminders = _ref.read(homeReminderProvider).reminders;
-      final now = DateTime.now();
-      final todayTasks = reminders.where((r) {
-        return r.dueAt.year == now.year && r.dueAt.month == now.month && r.dueAt.day == now.day;
-      }).toList();
-
-      if (todayTasks.isEmpty) {
-        final replyMsg = ChatMessage(
-          id: const Uuid().v4(),
-          text: isBangla
-              ? 'আজকের জন্য কোনো শিডিউল বা কাজ পেন্ডিং নেই। আপনার দিনটি সুন্দর হোক!'
-              : 'You have no scheduled tasks left for today. Everything is clear!',
-          isUser: false,
-          timestamp: DateTime.now(),
-        );
-        _appendBotMessage(replyMsg);
-      } else {
-        final summary = todayTasks.map((t) {
-          final timeStr = DateFormat.jm().format(t.dueAt);
-          final doneStr = t.isDone ? (isBangla ? ' (সম্পন্ন)' : ' (Done)') : '';
-          return '• ${t.title} — $timeStr$doneStr';
-        }).join('\n');
-
-        final replyMsg = ChatMessage(
-          id: const Uuid().v4(),
-          text: isBangla
-              ? 'আজকের আপনার শিডিউল তালিকা:\n\n$summary'
-              : 'Here is your agenda for today:\n\n$summary',
-          isUser: false,
-          timestamp: DateTime.now(),
-        );
-        _appendBotMessage(replyMsg);
-      }
-      return;
-    }
-
-    // 4. Document & Vault Data Query Command
-    if (lower.contains('document') ||
-        lower.contains('ডকুমেন্ট') ||
-        lower.contains('passport') ||
-        lower.contains('পাসপোর্ট') ||
-        lower.contains('nid') ||
-        lower.contains('এনআইডি') ||
-        lower.contains('vault') ||
-        lower.contains('ভল্ট')) {
-      final docMessages = state.messages.where((m) => m.hasDocument).toList();
-
-      if (docMessages.isNotEmpty) {
-        final lastDoc = docMessages.last;
-        final replyMsg = ChatMessage(
-          id: const Uuid().v4(),
-          text: isBangla
-              ? 'আপনার সংরক্ষিত ডকুমেন্ট পাওয়া গেছে:'
-              : 'Here is your encrypted document from memory:',
-          isUser: false,
-          timestamp: DateTime.now(),
-          documentTitle: lastDoc.documentTitle,
-          documentCategory: lastDoc.documentCategory,
-          documentExpiry: lastDoc.documentExpiry,
-          suggestedActions: isBangla ? ['নতুন ডকুমেন্ট যুক্ত করো'] : ['Attach Document'],
-        );
-        _appendBotMessage(replyMsg);
-      } else {
-        final replyMsg = ChatMessage(
-          id: const Uuid().v4(),
-          text: isBangla
-              ? 'বর্তমানে কোনো ডকুমেন্ট সংরক্ষিত নেই। নিচে বামের [📎] আইকনে ট্যাপ করে আপনার পাসপোর্ট বা এনআইডি সুরক্ষিত সংরক্ষণ করতে পারেন।'
-              : 'No documents stored yet. Tap the attachment icon [📎] below to securely encrypt and save your Passport or ID.',
-          isUser: false,
-          timestamp: DateTime.now(),
-          suggestedActions: isBangla ? ['পাসপোর্ট সংরক্ষণ করো'] : ['Attach Passport'],
-        );
-        _appendBotMessage(replyMsg);
-      }
-      return;
-    }
-
-    // 4. Default: AI Parsing for Reminder Creation
+    // 3. Intent-aware parsing through the backend AI gateway (DeepSeek by default).
+    //    The model returns ONE structured JSON object — never free-form replies.
     try {
       final aiService = _ref.read(aiApiServiceProvider);
       final parsed = await aiService.parseReminder(
         text: trimmed,
-        timezone: 'Asia/Dhaka',
+        timezone: _deviceTimezone,
       );
 
-      final DateTime effectiveDueAt = parsed.dueAt?.toLocal() ?? _heuristicDueAt(trimmed);
-      final String effectiveTitle = parsed.title.isNotEmpty ? parsed.title : trimmed;
-      final reminderId = const Uuid().v4();
+      if (parsed.intent == ParsedReminderData.intentList) {
+        _handleListIntent(isBangla);
+        return;
+      } else if (parsed.intent == ParsedReminderData.intentDelete) {
+        await _handleDeleteIntent(parsed, isBangla);
+        return;
+      } else if (parsed.intent == ParsedReminderData.intentUpdate) {
+        await _handleUpdateIntent(parsed, isBangla);
+        return;
+      } else if (parsed.intent == ParsedReminderData.intentCreate) {
+        await _handleCreateIntent(trimmed, parsed, isBangla);
+        return;
+      }
 
-      final reminderItem = ReminderItem(
-        id: reminderId,
-        title: effectiveTitle,
-        dueAt: effectiveDueAt,
-        category: _mapAiCategory(parsed.category),
-        priority: parsed.priority == 'HIGH' || parsed.priority == 'URGENT'
-            ? ReminderPriority.important
-            : ReminderPriority.normal,
-      );
-
-      // Add to reminder engine (registers exact alarm and triggers backend sync)
-      _ref.read(homeReminderProvider.notifier).addReminder(reminderItem);
-
-      final replyMsg = ChatMessage(
-        id: const Uuid().v4(),
-        text: isBangla
-            ? 'ঠিক আছে! আমি আপনার রিমাইন্ডার শিডিউল করেছি:'
-            : 'Got it! I have scheduled your reminder:',
-        isUser: false,
-        timestamp: DateTime.now(),
-        reminderId: reminderId,
-        reminderTitle: effectiveTitle,
-        reminderDueAt: effectiveDueAt,
-        suggestedActions: isBangla
-            ? ['মুছে ফেলুন', 'টেস্ট এলার্ট']
-            : ['Cancel', 'Test Alert'],
-      );
-
-      _appendBotMessage(replyMsg);
+      // chat intent → local canned responses (AI never writes free-form replies)
+      _appendBotMessage(_botMsg(_generateConversationalResponse(lower, isBangla)));
     } catch (e) {
-      // Fallback: Local heuristic parse
+      // Fallback: local heuristic parse with mandatory confirmation gate
       final fallbackDue = _heuristicDueAt(trimmed);
-      final reminderId = const Uuid().v4();
-      final reminderItem = ReminderItem(
-        id: reminderId,
-        title: trimmed,
-        dueAt: fallbackDue,
-        category: ReminderCategory.personal,
-      );
-      _ref.read(homeReminderProvider.notifier).addReminder(reminderItem);
 
       final replyMsg = ChatMessage(
         id: const Uuid().v4(),
-        text: isBangla
-            ? 'রিমাইন্ডারটি সেভ করা হয়েছে:'
-            : 'Saved your reminder:',
+        text: '',
         isUser: false,
         timestamp: DateTime.now(),
-        reminderId: reminderId,
         reminderTitle: trimmed,
         reminderDueAt: fallbackDue,
-        suggestedActions: isBangla ? ['মুছে ফেলুন'] : ['Cancel'],
+        isPendingConfirmation: true,
+        pendingReminderCategory: 'personal',
       );
       _appendBotMessage(replyMsg);
     }
   }
 
+  /// create_reminder: a clarifying question always wins over a guess, and the
+  /// compact pending bubble requires explicit ✓ before any alarm is scheduled.
+  Future<void> _handleCreateIntent(
+      String userText, ParsedReminderData parsed, bool isBangla) async {
+    if (parsed.needsClarification) {
+      _appendBotMessage(_botMsg(parsed.clarifyingQuestion!));
+      return;
+    }
+
+    final effectiveTitle = parsed.title.trim().isNotEmpty
+        ? parsed.title.trim()
+        : (isBangla ? 'রিমাইন্ডার' : 'Reminder');
+    final effectiveDueAt = parsed.dueAt?.toLocal() ?? _heuristicDueAt(userText);
+
+    _appendBotMessage(ChatMessage(
+      id: const Uuid().v4(),
+      // Compact pending confirmation bubble — no alarm until ✓
+      text: '',
+      isUser: false,
+      timestamp: DateTime.now(),
+      reminderTitle: effectiveTitle,
+      reminderDueAt: effectiveDueAt,
+      isPendingConfirmation: true,
+      pendingReminderCategory: parsed.category,
+      pendingReminderPriority: parsed.priority,
+    ));
+  }
+
+  /// list_reminders: agenda text built in app code from saved reminders.
+  void _handleListIntent(bool isBangla) {
+    final upcoming = _ref.read(homeReminderProvider).reminders
+        .where((r) => !r.isDone)
+        .toList()
+      ..sort((a, b) => a.dueAt.compareTo(b.dueAt));
+
+    if (upcoming.isEmpty) {
+      _appendBotMessage(_botMsg(isBangla
+          ? 'এখন কোনো আসন্ন রিমাইন্ডার নেই।'
+          : 'You have no upcoming reminders right now.'));
+      return;
+    }
+
+    final lines = upcoming.map((t) {
+      final timeStr = DateFormat.jm().format(t.dueAt);
+      final dateStr = DateFormat.MMMd().format(t.dueAt);
+      return '• ${t.title} — $timeStr, $dateStr';
+    }).join('\n');
+
+    _appendBotMessage(_botMsg(isBangla
+        ? 'আপনার আসন্ন রিমাইন্ডারগুলো:\n\n$lines'
+        : 'Here are your upcoming reminders:\n\n$lines'));
+  }
+
+  /// delete_reminder: one unambiguous match → remove; ambiguous → list & ask.
+  Future<void> _handleDeleteIntent(ParsedReminderData parsed, bool isBangla) async {
+    final active = _ref.read(homeReminderProvider).reminders
+        .where((r) => !r.isDone)
+        .toList();
+
+    final query = parsed.title.trim().toLowerCase();
+    final matches = query.isEmpty
+        ? active
+        : active.where((r) => r.title.toLowerCase().contains(query)).toList();
+
+    if (matches.length == 1) {
+      final target = matches.first;
+      _ref.read(homeReminderProvider.notifier).deleteReminder(target.id);
+      _appendBotMessage(_botMsg(isBangla
+          ? 'মুছে ফেলা হয়েছে: "${target.title}"'
+          : 'Removed: "${target.title}".'));
+      return;
+    }
+
+    if (matches.length > 1) {
+      final lines = matches
+          .map((t) => '• ${t.title} — ${DateFormat.jm().format(t.dueAt)}')
+          .join('\n');
+      _appendBotMessage(_botMsg(isBangla
+          ? 'একাধিক রিমাইন্ডার মিলেছে। কোনটি মুছবেন?\n\n$lines'
+          : 'Multiple reminders matched. Which one should I remove?\n\n$lines'));
+      return;
+    }
+
+    _appendBotMessage(_botMsg(isBangla
+        ? 'মুছতে হবে এমন কোনো রিমাইন্ডার খুঁজে পাইনি।'
+        : 'I could not find a matching reminder to delete.'));
+  }
+
+  /// update_reminder: title match + new time → reschedule; otherwise ask.
+  Future<void> _handleUpdateIntent(ParsedReminderData parsed, bool isBangla) async {
+    if (parsed.needsClarification || parsed.dueAt == null) {
+      _appendBotMessage(_botMsg(parsed.clarifyingQuestion ??
+          (isBangla
+              ? 'নতুন সময়টা কী হবে?'
+              : 'What should the new time be?')));
+      return;
+    }
+
+    final active = _ref.read(homeReminderProvider).reminders
+        .where((r) => !r.isDone)
+        .toList();
+    final query = parsed.title.trim().toLowerCase();
+    final matches = query.isEmpty
+        ? <ReminderItem>[]
+        : active.where((r) => r.title.toLowerCase().contains(query)).toList();
+
+    if (matches.length == 1) {
+      final target = matches.first;
+      final newDue = parsed.dueAt!.toLocal();
+      final updated = target.copyWith(dueAt: newDue);
+      _ref.read(homeReminderProvider.notifier).updateReminder(updated);
+      final timeStr = DateFormat.jm().format(newDue);
+      final dateStr = DateFormat.MMMd().format(newDue);
+      _appendBotMessage(_botMsg(isBangla
+          ? 'আপডেট হয়েছে: "${target.title}" এখন $timeStr, $dateStr।'
+          : 'Updated: "${target.title}" rescheduled to $timeStr, $dateStr.'));
+      return;
+    }
+
+    if (matches.length > 1) {
+      final lines = matches
+          .map((t) => '• ${t.title} — ${DateFormat.jm().format(t.dueAt)}')
+          .join('\n');
+      _appendBotMessage(_botMsg(isBangla
+          ? 'একাধিক রিমাইন্ডার মিলেছে। কোনটি আপডেট করবেন?\n\n$lines'
+          : 'Multiple reminders matched. Which one should I update?\n\n$lines'));
+      return;
+    }
+
+    _appendBotMessage(_botMsg(isBangla
+        ? 'আপডেট করার মতো কোনো রিমাইন্ডার খুঁজে পাইনি।'
+        : 'I could not find a matching reminder to update.'));
+  }
+
+  ChatMessage _botMsg(String text) => ChatMessage(
+        id: const Uuid().v4(),
+        text: text,
+        isUser: false,
+        timestamp: DateTime.now(),
+      );
+
   void _appendBotMessage(ChatMessage botMsg) {
     final nextList = [...state.messages, botMsg];
     state = state.copyWith(messages: nextList, isThinking: false);
     ChatArchiveService.instance.saveActiveMessages(nextList);
+  }
+
+  bool _isConversationalCommentary(String lower) {
+    // Pure conversational greetings or chatter
+    const conversationalTokens = [
+      'hello', 'hi', 'hey', 'good morning', 'good evening', 'good night',
+      'how are you', 'what are you', 'who are you', 'thanks', 'thank you',
+      'welcome', 'bye', 'goodbye', 'okay', 'ok', 'great', 'awesome', 'nice',
+      'হাই', 'হ্যালো', 'কেমন আছো', 'কেমন আছেন', 'ধন্যবাদ', 'থ্যাংকস',
+      'শুভ সকাল', 'শুভ রাত্রি', 'ঠিক আছে', 'আচ্ছা', 'বিদায়', 'কে তুমি',
+    ];
+
+    final cleaned = lower.replaceAll(RegExp(r'[^\w\s\u0980-\u09FF]'), '').trim();
+    for (final token in conversationalTokens) {
+      if (cleaned == token || cleaned.startsWith('$token ') || cleaned.endsWith(' $token')) {
+        // Ensure no scheduling keywords like 'at', 'pm', 'am', 'tomorrow', 'কাল'
+        final hasSchedulingToken = cleaned.contains('pm') ||
+            cleaned.contains('am') ||
+            cleaned.contains('কাল') ||
+            cleaned.contains('আজ') ||
+            cleaned.contains('tomorrow') ||
+            cleaned.contains('remind') ||
+            cleaned.contains('রিমাইন্ডার') ||
+            cleaned.contains('alarm');
+        if (!hasSchedulingToken) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  String _generateConversationalResponse(String lower, bool isBangla) {
+    if (lower.contains('thank') || lower.contains('ধন্যবাদ')) {
+      return isBangla
+          ? 'আপনাকে স্বাগতম! আপনার কোনো রিমাইন্ডার বা শিডিউল থাকলে জানান।'
+          : "You're welcome! Let me know if you need to schedule a reminder or note.";
+    }
+    if (lower.contains('how are you') || lower.contains('কেমন আছো')) {
+      return isBangla
+          ? 'আমি দারুণ আছি! আপনার দিনটি সাজাতে কীভাবে সাহায্য করতে পারি?'
+          : "I'm running smoothly! How can I assist you with your day?";
+    }
+    if (lower.contains('who are you') || lower.contains('কে তুমি')) {
+      return isBangla
+          ? 'আমি পিঙ্গো — আপনার ব্যক্তিগত প্রাইভেসি-ফার্স্ট অ্যাসিস্ট্যান্ট।'
+          : "I'm Pingo — your minimalist, privacy-first conversational memory and reminder assistant.";
+    }
+    return isBangla
+        ? 'হ্যালো! আমি প্রস্তুত। আপনি যেকোনো রিমাইন্ডার বা ডকুমেন্ট যোগ করতে পারেন।'
+        : 'Hello! Ready to help. You can tell me to set a reminder or attach a document.';
+  }
+
+  String _inferCategoryFromFilename(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('passport') || lower.contains('nid') || lower.contains('license') || lower.contains('id')) {
+      return 'Identity';
+    }
+    if (lower.contains('bill') || lower.contains('invoice') || lower.contains('receipt') || lower.contains('tax')) {
+      return 'Finance';
+    }
+    if (lower.contains('health') || lower.contains('medical') || lower.contains('prescription')) {
+      return 'Health';
+    }
+    return 'General';
   }
 
   DateTime _heuristicDueAt(String text) {

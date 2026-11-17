@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:intl/intl.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -150,17 +151,19 @@ class NotificationService {
     // Ensure 32-bit positive integer for Android PendingIntent
     final safeId = id.abs() % 2147483647;
 
+    final String timeStr = DateFormat.jm().format(scheduledDate);
+    final String dateStr = DateFormat.MMMd().format(scheduledDate);
+
     final displayBody = (body.isNotEmpty && body != 'Scheduled alert from Pingo')
-        ? '$title\n$body'
-        : title;
+        ? body
+        : '⏰ $timeStr · $dateStr';
 
     final styleInfo = BigTextStyleInformation(
       displayBody,
-      htmlFormatBigText: true,
-      contentTitle: '<b>Pingo</b>',
-      htmlFormatContentTitle: true,
-      summaryText: 'Reminder',
-      htmlFormatSummaryText: true,
+      htmlFormatBigText: false,
+      contentTitle: title,
+      htmlFormatContentTitle: false,
+      summaryText: 'Pingo Reminder',
     );
 
     final androidDetails = AndroidNotificationDetails(
@@ -173,7 +176,7 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.message,
+      category: AndroidNotificationCategory.reminder,
       ticker: title,
       styleInformation: styleInfo,
     );
@@ -223,7 +226,7 @@ class NotificationService {
         await _notificationsPlugin.zonedSchedule(
           safeId,
           title,
-          body,
+          displayBody,
           targetTz,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.alarmClock,
@@ -247,7 +250,7 @@ class NotificationService {
       await _notificationsPlugin.zonedSchedule(
         safeId,
         title,
-        body,
+        displayBody,
         targetTz,
         notificationDetails,
         androidScheduleMode: scheduleMode,
@@ -266,7 +269,7 @@ class NotificationService {
         await _notificationsPlugin.zonedSchedule(
           safeId,
           title,
-          body,
+          displayBody,
           fallbackTz,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -310,21 +313,20 @@ class NotificationService {
     return true;
   }
 
-  /// Shows an instant test notification styled like a message from Pingo.
+  /// Shows an instant test notification styled with dynamic user title and body.
   Future<bool> showInstantTestNotification({
-    String title = 'Pingo',
-    String body = 'This is a test notification from Pingo.',
+    String title = 'Pingo Test Alert',
+    String body = 'Alarms and notification engine are fully operational.',
   }) async {
     if (!_isInitialized) await initialize();
-    const styleInfo = BigTextStyleInformation(
-      'This is a test notification from Pingo. Notifications and alerts are operational.',
-      htmlFormatBigText: true,
-      contentTitle: '<b>Pingo</b>',
-      htmlFormatContentTitle: true,
-      summaryText: 'Message',
-      htmlFormatSummaryText: true,
+    final styleInfo = BigTextStyleInformation(
+      body,
+      htmlFormatBigText: false,
+      contentTitle: title,
+      htmlFormatContentTitle: false,
+      summaryText: 'Pingo Test',
     );
-    const androidDetails = AndroidNotificationDetails(
+    final androidDetails = AndroidNotificationDetails(
       _urgentChannelId,
       _urgentChannelName,
       channelDescription: _urgentChannelDesc,
@@ -333,11 +335,12 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.message,
+      category: AndroidNotificationCategory.reminder,
+      ticker: title,
       styleInformation: styleInfo,
     );
-    const details = NotificationDetails(android: androidDetails);
-    await _notificationsPlugin.show(999999, 'Pingo', body, details);
+    final details = NotificationDetails(android: androidDetails);
+    await _notificationsPlugin.show(999999, title, body, details);
     return true;
   }
 
@@ -353,11 +356,10 @@ class NotificationService {
 
     final styleInfo = BigTextStyleInformation(
       body,
-      htmlFormatBigText: true,
-      contentTitle: '<b>$title</b>',
-      htmlFormatContentTitle: true,
-      summaryText: 'Reminder',
-      htmlFormatSummaryText: true,
+      htmlFormatBigText: false,
+      contentTitle: title,
+      htmlFormatContentTitle: false,
+      summaryText: 'Pingo Alert',
     );
 
     final androidDetails = AndroidNotificationDetails(
