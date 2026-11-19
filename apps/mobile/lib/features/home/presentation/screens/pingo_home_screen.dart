@@ -7,8 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/services/voice_recognition_service.dart';
 import '../../domain/chat_message.dart';
-import '../state/context_suggestion_service.dart';
-import '../state/home_reminder_provider.dart';
 import '../state/pingo_chat_provider.dart';
 import '../widgets/chat_message_bubble.dart';
 import '../widgets/date_separator_chip.dart';
@@ -273,12 +271,11 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
             children: [
               _buildTopBar(isBangla),
 
-              const Divider(color: Color(0xFF172033), height: 1),
-
-              // Main Area: greeting canvas when empty, chat stream otherwise
+              // Main Area: pure wallpaper canvas when empty (WhatsApp-style),
+              // chat stream otherwise
               Expanded(
                 child: chatState.messages.isEmpty && !chatState.isThinking
-                    ? _buildIdleState(isBangla)
+                    ? const SizedBox.expand()
                     : ListView(
                         controller: _scrollController,
                         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -333,87 +330,64 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
   // ───────────────────────────── TOP BAR ─────────────────────────────
 
   Widget _buildTopBar(bool isBangla) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFF131C27),
+        border: Border(bottom: BorderSide(color: Color(0xFF1D2836), width: 1)),
+      ),
       child: Row(
         children: [
-          // App identity + operational status (WhatsApp-header feel)
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF131B2A),
-                    border: Border.all(
-                        color: const Color(0xFF1E293B), width: 1.2),
-                  ),
-                  child: const Icon(
-                    Icons.smart_toy_outlined,
-                    color: Color(0xFF38BDF8),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Pingo',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFF1F5F9),
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFF10B981),
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          isBangla ? 'সক্রিয় — প্রস্তুত' : 'Online — Ready',
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF10B981),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+          // Avatar: penguin mascot in a gradient ring with ambient glow.
+          // Image is authored on a yellow canvas with the penguin's head
+          // slightly above centre — frame it there.
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 2),
                 ),
               ],
-            ),
-          ),
-
-          // Bilingual Toggle Pill: [ বাং | EN ]
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF131B2A),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF1E293B), width: 1),
             ),
             padding: const EdgeInsets.all(2),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _langPill('বাং', 'bn', isBangla),
-                _langPill('EN', 'en', !isBangla),
-              ],
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF0D1420),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                'assets/images/penguin_avatar.png',
+                fit: BoxFit.cover,
+                alignment: const Alignment(0, -0.55),
+                filterQuality: FilterQuality.medium,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Pingo',
+              style: TextStyle(
+                fontSize: 17.5,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFFF1F5F9),
+                letterSpacing: -0.3,
+              ),
             ),
           ),
 
-          // Menu: New chat / My reminders
+          // Menu: New chat / My reminders / Language
           PopupMenuButton<String>(
             icon: const Icon(
               Icons.more_vert_rounded,
@@ -439,6 +413,25 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                   isBangla ? 'আমার রিমাইন্ডার' : 'My reminders',
                 ),
               ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'lang_bn',
+                child: _menuItem(
+                  isBangla
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
+                  'বাংলা',
+                ),
+              ),
+              PopupMenuItem(
+                value: 'lang_en',
+                child: _menuItem(
+                  !isBangla
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
+                  'English',
+                ),
+              ),
             ],
             onSelected: (value) {
               if (value == 'new_chat') {
@@ -451,6 +444,11 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                     builder: (_) => const MyRemindersScreen(),
                   ),
                 );
+              } else if (value == 'lang_bn' || value == 'lang_en') {
+                HapticFeedback.selectionClick();
+                ref
+                    .read(pingoChatProvider.notifier)
+                    .setLanguage(value == 'lang_bn' ? 'bn' : 'en');
               }
             },
           ),
@@ -690,32 +688,38 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                 shape: BoxShape.circle,
                 gradient: hasInputText
                     ? const LinearGradient(
-                        colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                        colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       )
                     : null,
-                color: hasInputText ? null : const Color(0xFF1E293B),
+                color: hasInputText ? null : const Color(0xFF274257),
                 border: Border.all(
                   color: hasInputText
-                      ? const Color(0xFF3B82F6)
-                      : const Color(0xFF334155),
+                      ? Colors.white.withValues(alpha: 0.22)
+                      : const Color(0xFF3A5670),
                   width: 1,
                 ),
                 boxShadow: hasInputText
                     ? [
                         BoxShadow(
                           color:
-                              const Color(0xFF2563EB).withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
+                              const Color(0xFF3B82F6).withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
                         ),
                       ]
-                    : null,
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Icon(
                 hasInputText ? Icons.arrow_upward_rounded : Icons.mic_rounded,
-                color: hasInputText ? Colors.white : const Color(0xFF38BDF8),
+                color: hasInputText ? Colors.white : const Color(0xFFA7C8E8),
                 size: 22,
               ),
             ),
@@ -725,157 +729,4 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     );
   }
 
-  // ──────────────────────────── IDLE STATE ────────────────────────────
-
-  Widget _buildIdleState(bool isBangla) {
-    final reminders = ref.watch(homeReminderProvider).reminders;
-    final storedDocsCount = ref
-        .watch(pingoChatProvider)
-        .messages
-        .where((m) => m.hasDocument)
-        .length;
-    final pendingCount = reminders.where((r) => !r.isDone).length;
-
-    final suggestions = ContextSuggestionService.instance.getSuggestions(
-      language: isBangla ? 'bn' : 'en',
-      pendingTasksCount: pendingCount,
-      storedDocsCount: storedDocsCount,
-    );
-    final timeGreeting = ContextSuggestionService.instance
-        .getGreetingHeader(language: isBangla ? 'bn' : 'en');
-
-    return Center(
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF131B2A),
-                border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
-              ),
-              child: const Icon(
-                Icons.memory_rounded,
-                color: Color(0xFF38BDF8),
-                size: 26,
-              ),
-            ),
-            const SizedBox(height: 18),
-
-            Text(
-              timeGreeting,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFFF8FAFC),
-                letterSpacing: -0.3,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              isBangla
-                  ? 'আপনার শিডিউল, রিমাইন্ডার এবং ডকুমেন্টের জন্য আমি প্রস্তুত।'
-                  : 'Ready to coordinate your schedule, reminders, and documents.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF94A3B8),
-                height: 1.45, // Bangla-safe line height
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                isBangla ? 'প্রাসঙ্গিক প্রস্তাবনা' : 'CONTEXT SUGGESTIONS',
-                style: const TextStyle(
-                  fontSize: 11,
-                  letterSpacing: 1.0,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            ...suggestions.map((suggestion) {
-              return InkWell(
-                onTap: () => _handleSend(suggestion),
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF131B2A).withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(14),
-                    border:
-                        Border.all(color: const Color(0xFF1E293B), width: 1.1),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.bolt_rounded,
-                        size: 15,
-                        color: Color(0xFF38BDF8),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          suggestion,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            color: Color(0xFFE2E8F0),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 12,
-                        color: Color(0xFF64748B),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _langPill(String label, String langCode, bool isSelected) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        ref.read(pingoChatProvider.notifier).setLanguage(langCode);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: isSelected ? const Color(0xFF2563EB) : Colors.transparent,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-          ),
-        ),
-      ),
-    );
-  }
 }

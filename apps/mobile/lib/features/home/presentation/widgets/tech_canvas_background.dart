@@ -68,50 +68,56 @@ class _PingoDoodlePainter extends CustomPainter {
     // Slate icons: stroke #94A3B8, opacity 0.065, strokeWidth 1.4
     final slateColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
     final slatePaint = Paint()
-      ..color = slateColor.withValues(alpha: isDark ? 0.065 : 0.08)
+      ..color = slateColor.withValues(alpha: isDark ? 0.17 : 0.08)
       ..strokeWidth = 1.4
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
 
     final slateFillPaint = Paint()
-      ..color = slateColor.withValues(alpha: isDark ? 0.065 : 0.08)
+      ..color = slateColor.withValues(alpha: isDark ? 0.17 : 0.08)
       ..style = PaintingStyle.fill;
 
-    // Emerald accent: stroke #10B981, opacity 0.07, strokeWidth 1.4
+    // Emerald accent: stroke #10B981, strokeWidth 1.4
     final emeraldColor = const Color(0xFF10B981);
     final emeraldPaint = Paint()
-      ..color = emeraldColor.withValues(alpha: isDark ? 0.07 : 0.09)
+      ..color = emeraldColor.withValues(alpha: isDark ? 0.16 : 0.09)
       ..strokeWidth = 1.4
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
 
-    // Faint grid dots and crosshairs: stroke #94A3B8, opacity 0.045, strokeWidth 1.4
+    // Faint grid dots and crosshairs, strokeWidth 1.4
     final faintPaint = Paint()
-      ..color = slateColor.withValues(alpha: isDark ? 0.045 : 0.06)
+      ..color = slateColor.withValues(alpha: isDark ? 0.12 : 0.06)
       ..strokeWidth = 1.4
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
 
     final faintFillPaint = Paint()
-      ..color = slateColor.withValues(alpha: isDark ? 0.045 : 0.06)
+      ..color = slateColor.withValues(alpha: isDark ? 0.12 : 0.06)
       ..style = PaintingStyle.fill;
 
-    // --- 3. Seamless 240x240 Tiled Grid Drawing ---
-    const tileSize = 240.0;
-    final cols = (size.width / tileSize).ceil() + 1;
+    // --- 3. Dense staggered doodle tiling (150px cells) ---
+    // Smaller cells + row stagger + mirrored tiles = organic density that
+    // doesn't read as a repeating grid.
+    const tileSize = 150.0;
+    final cols = (size.width / tileSize).ceil() + 2;
     final rows = (size.height / tileSize).ceil() + 1;
 
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
-        final ox = c * tileSize;
+        final ox = c * tileSize - (r % 2) * (tileSize / 2);
         final oy = r * tileSize;
+        final flipH = (r + c) % 2 == 1;
+        final flipV = r % 2 == 1;
         _drawDoodleTile(
           canvas,
           ox,
           oy,
+          flipH,
+          flipV,
           slatePaint,
           slateFillPaint,
           emeraldPaint,
@@ -126,12 +132,29 @@ class _PingoDoodlePainter extends CustomPainter {
     Canvas canvas,
     double ox,
     double oy,
+    bool flipH,
+    bool flipV,
     Paint slatePaint,
     Paint slateFill,
     Paint emeraldPaint,
     Paint faintPaint,
     Paint faintFill,
   ) {
+    canvas.save();
+    // The doodle art is authored on a 240px canvas; scale it to fit the
+    // smaller tiled cell so adjacent tiles never overlap.
+    const srcTile = 240.0;
+    final s = 150.0 / srcTile;
+    canvas.translate(ox, oy);
+    canvas.scale(s);
+    canvas.translate(-ox, -oy);
+    if (flipH || flipV) {
+      final cx = ox + 75; // tileSize / 2 — mirror around tile centre
+      final cy = oy + 75;
+      canvas.translate(cx, cy);
+      canvas.scale(flipH ? -1.0 : 1.0, flipV ? -1.0 : 1.0);
+      canvas.translate(-cx, -cy);
+    }
     // ----------------------------------------------------
     // Group 1: Slate Tone (#94A3B8, opacity 0.065)
     // ----------------------------------------------------
@@ -287,6 +310,8 @@ class _PingoDoodlePainter extends CustomPainter {
     canvas.drawLine(Offset(ox + 144, oy + 218), Offset(ox + 153, oy + 218), faintPaint);
     canvas.drawLine(Offset(ox + 216, oy + 64), Offset(ox + 216, oy + 73), faintPaint);
     canvas.drawLine(Offset(ox + 216, oy + 144), Offset(ox + 216, oy + 153), faintPaint);
+
+    canvas.restore();
   }
 
   @override
