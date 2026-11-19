@@ -43,14 +43,24 @@ class FcmService {
   static final FcmService instance = FcmService._();
 
   bool _isInitialized = false;
+  bool _listenersAttached = false;
+  Future<void>? _initPromise;
   String? _fcmToken;
 
   String? get fcmToken => _fcmToken;
 
   /// Initializes Firebase and configures notification streams.
-  Future<void> initialize() async {
-    if (_isInitialized) return;
+  ///
+  /// Idempotent and concurrency-safe: concurrent callers share one run.
+  /// Throws if initialization fails — the failed attempt is not cached,
+  /// so the next call starts a fresh run. Stream listeners are attached
+  /// at most once per session, even across retries.
+  Future<void> initialize() {
+    if (_isInitialized) return Future.value();
+    return _initPromise ??= _initializeInternal();
+  }
 
+  Future<void> _initializeInternal() async {
     try {
       await Firebase.initializeApp();
       debugPrint('[FcmService] Firebase app initialized.');
@@ -88,43 +98,54 @@ class FcmService {
         await _registerTokenWithBackend(_fcmToken!);
       }
 
-      // 5. Listen to token refresh events
-      messaging.onTokenRefresh.listen((newToken) async {
-        debugPrint('[FcmService] FCM token refreshed: $newToken');
-        _fcmToken = newToken;
-        await _registerTokenWithBackend(newToken);
-      });
+      // 5-7. Stream listeners — attached at most once per session.
+      // Retrying a failed init must NOT re-run these `.listen()` calls:
+      // broadcast streams would stack duplicate subscriptions, causing
+      // duplicate foreground notifications and duplicate token-refresh
+      // backend registrations for the rest of the session.
+      if (!_listenersAttached) {
+        // 5. Listen to token refresh events
+        messaging.onTokenRefresh.listen((newToken) async {
+          debugPrint('[FcmService] FCM token refreshed: $newToken');
+          _fcmToken = newToken;
+          await _registerTokenWithBackend(newToken);
+        });
 
-      // 6. Foreground message listener (App is open on screen)
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-        try {
+        // 6. Foreground message listener (App is open on screen)
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+          try {
+            debugPrint(
+                '[FcmService] Foreground message arrived: ${message.messageId}');
+            final notification = message.notification;
+            final data = message.data;
+
+            final String title =
+                notification?.title ?? data['title'] ?? 'Pingo';
+            final String body = notification?.body ??
+                data['body'] ??
+                'You have a scheduled reminder right now.';
+
+            await NotificationService.instance.showPushNotification(
+              id: message.messageId?.hashCode ??
+                  DateTime.now().millisecondsSinceEpoch,
+              title: title,
+              body: body,
+              payload: jsonEncode(data),
+            );
+          } catch (e, stack) {
+            debugPrint(
+                '[FcmService] Foreground push processing error: $e\n$stack');
+          }
+        });
+
+        // 7. Notification clicked while app was in background
+        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
           debugPrint(
-              '[FcmService] Foreground message arrived: ${message.messageId}');
-          final notification = message.notification;
-          final data = message.data;
+              '[FcmService] User tapped notification from background: ${message.data}');
+        });
 
-          final String title = notification?.title ?? data['title'] ?? 'Pingo';
-          final String body = notification?.body ??
-              data['body'] ??
-              'You have a scheduled reminder right now.';
-
-          await NotificationService.instance.showPushNotification(
-            id: message.messageId?.hashCode ??
-                DateTime.now().millisecondsSinceEpoch,
-            title: title,
-            body: body,
-            payload: jsonEncode(data),
-          );
-        } catch (e, stack) {
-          debugPrint('[FcmService] Foreground push processing error: $e\n$stack');
-        }
-      });
-
-      // 7. Notification clicked while app was in background
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        debugPrint(
-            '[FcmService] User tapped notification from background: ${message.data}');
-      });
+        _listenersAttached = true;
+      }
 
       // 8. Notification opened app from terminated state
       final initialMessage = await messaging.getInitialMessage();
@@ -136,16 +157,32 @@ class FcmService {
       _isInitialized = true;
       debugPrint('[FcmService] Initialized successfully.');
     } catch (e, stack) {
+      _initPromise = null; // allow retry on next call
       debugPrint('[FcmService] Initialization error: $e\n$stack');
+      rethrow; // callers must be able to observe init failure
     }
   }
 
   /// Sends the FCM device token to the FastAPI backend.
+  ///
+  /// Returns false (and logs the root cause) if Firebase initialization
+  /// or token retrieval failed — never silently.
   Future<bool> registerActiveToken() async {
+    // Ordering guarantee: Firebase must be fully initialized before
+    // getToken() — this used to race with app startup when initialization
+    // became fire-and-forget in main(), silently killing push registration.
+    try {
+      await initialize();
+    } catch (e, stack) {
+      debugPrint('[FcmService] Cannot register token — init failed: $e\n$stack');
+      return false;
+    }
     if (_fcmToken == null) {
       try {
         _fcmToken = await FirebaseMessaging.instance.getToken();
-      } catch (_) {}
+      } catch (e, stack) {
+        debugPrint('[FcmService] getToken failed: $e\n$stack');
+      }
     }
     if (_fcmToken != null) {
       return await _registerTokenWithBackend(_fcmToken!);
@@ -195,6 +232,9 @@ class FcmService {
   /// Dispatches a real-time test push notification from the FastAPI backend to this device.
   Future<bool> triggerBackendTestPush() async {
     try {
+      // Same ordering guarantee as registerActiveToken: getToken() must not
+      // race startup initialization. Errors here are logged by the outer catch.
+      await initialize();
       final token = _fcmToken ?? await FirebaseMessaging.instance.getToken();
       if (token == null) return false;
       final authToken = await LocalStorageService.instance.getAuthToken();
