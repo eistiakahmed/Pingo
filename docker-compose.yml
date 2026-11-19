@@ -20,6 +20,7 @@ services:
     volumes:
       - ./apps/server/app:/app/app
       - ./apps/server/alembic:/app/alembic
+      - ./apps/server/firebase-service-account.json:/app/firebase-service-account.json:ro
     networks:
       - dokaandigit_net
     command: >
