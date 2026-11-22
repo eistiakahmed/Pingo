@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/theme/app_colors.dart';
 
-/// Small centred date chip shown between message groups, WhatsApp-style:
-/// "Today", "Yesterday", or a plain date for older days.
+/// Centred ledger date separator chip shown between message groups.
+/// Uses the Ink neutral ramp, 8px control radius, and tabular numerals.
 class DateSeparatorChip extends StatelessWidget {
   final DateTime date;
   final bool isBangla;
@@ -29,19 +30,19 @@ class DateSeparatorChip extends StatelessWidget {
     return Center(
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF182230),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF22304A), width: 1),
+          color: AppColors.inkCard,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.inkBorder, width: 1),
         ),
         child: Text(
           _label,
           style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.2,
-            color: Color(0xFF94A3B8),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            fontFeatures: [FontFeature.tabularFigures()],
+            color: AppColors.paperSubtle,
           ),
         ),
       ),

@@ -1,17 +1,25 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 /// Application API Gateway Configuration and Endpoints
 class ApiConfig {
   ApiConfig._();
 
-  /// Default API Base URL based on runtime platform
+  /// Production AWS API Gateway URL
+  static const String productionBaseUrl = 'http://98.84.163.177';
+
+  /// Default API Base URL based on runtime build mode and platform
   static String get defaultBaseUrl {
     const fromEnv = String.fromEnvironment('PINGO_API_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
 
+    if (kReleaseMode) {
+      return productionBaseUrl;
+    }
+
     try {
       if (Platform.isAndroid) {
-        // Android emulator localhost alias
+        // Android emulator localhost alias in debug mode
         return 'http://10.0.2.2:8000';
       }
     } catch (_) {
@@ -35,4 +43,3 @@ class ApiConfig {
   static String get registerDeviceToken => '$baseUrl$prefixV1/devices/register-token';
   static String get testPush => '$baseUrl$prefixV1/devices/test-push';
 }
-

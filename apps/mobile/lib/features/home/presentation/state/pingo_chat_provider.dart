@@ -5,8 +5,6 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/network/providers.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import '../../../action_stream/domain/ai_models.dart';
-import '../../../../core/services/fcm_service.dart';
-import '../../../../core/services/notification_service.dart';
 import '../../../../core/services/voice_recognition_service.dart';
 import '../../domain/chat_message.dart';
 import '../../domain/reminder_item.dart';
@@ -122,7 +120,6 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
 
     final nextList = [...state.messages, userAttachmentMsg, botConfirmationMsg];
     state = state.copyWith(messages: nextList, isThinking: false);
-    await ChatArchiveService.instance.saveActiveMessages(nextList);
   }
 
   /// Sets an expiry reminder alert for an attached document.
@@ -149,8 +146,6 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
 
     final replyMsg = ChatMessage(
       id: const Uuid().v4(),
-      // Compact confirmation: the bubble renders 'Reminder set: title, time · date'
-      // directly from these fields, so no free-form prose is needed.
       text: '',
       isUser: false,
       timestamp: DateTime.now(),
@@ -196,7 +191,6 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
     final updatedList = List<ChatMessage>.from(state.messages);
     updatedList[index] = updatedMsg;
     state = state.copyWith(messages: updatedList);
-    await ChatArchiveService.instance.saveActiveMessages(updatedList);
   }
 
   /// Discards a proposed reminder without scheduling any alarm.
@@ -208,18 +202,16 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
     final targetMsg = state.messages[index];
     final updatedMsg = targetMsg.copyWith(
       isPendingConfirmation: false,
-      reminderTitle: null,
-      reminderDueAt: null,
+      clearReminder: true,
       text: isBangla
-          ? 'প্রস্তাবিত রিমাইন্ডারটি বাতিল করা হয়েছে।'
-          : 'Proposed reminder discarded.',
-      suggestedActions: [],
+          ? 'প্রস্তাবিত রিমাইন্ডারটি বাতিল করা হয়েছে'
+          : 'Proposed reminder discarded',
+      suggestedActions: const [],
     );
 
     final updatedList = List<ChatMessage>.from(state.messages);
     updatedList[index] = updatedMsg;
     state = state.copyWith(messages: updatedList);
-    await ChatArchiveService.instance.saveActiveMessages(updatedList);
   }
 
   /// Sends a message and orchestrates intent filtering, conversational commentary, and mandatory confirmation reminder proposals.
@@ -236,44 +228,17 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
 
     final updatedMessages = [...state.messages, userMsg];
     state = state.copyWith(messages: updatedMessages, isThinking: true);
-    await ChatArchiveService.instance.saveActiveMessages(updatedMessages);
 
     final lower = trimmed.toLowerCase();
     final isBangla = state.language == 'bn' || _containsBangla(trimmed);
 
-    // 1. Instant Test Alert Command
-    if (lower.contains('test') ||
-        lower.contains('চেক') ||
-        lower.contains('check alert') ||
-        lower.contains('notification')) {
-      await NotificationService.instance.showInstantTestNotification(
-        title: isBangla ? 'পিঙ্গো টেস্ট এলার্ট' : 'Pingo Test Alert',
-        body: isBangla
-            ? 'এলার্ম এবং নোটিফিকেশন ইঞ্জিন সফলভাবে সক্রিয় রয়েছে।'
-            : 'Alarms and notification engine are fully operational.',
-      );
-      FcmService.instance.triggerBackendTestPush();
-
-      final replyMsg = ChatMessage(
-        id: const Uuid().v4(),
-        text: isBangla
-            ? 'আপনার ফোনে টেস্ট নোটিফিকেশন পাঠানো হয়েছে। ব্যানার এবং সাউন্ড আসলে সিস্টেম ১০০% প্রস্তুত।'
-            : 'Instant test alert triggered. If you hear the chime and see the banner, notifications are operational.',
-        isUser: false,
-        timestamp: DateTime.now(),
-      );
-
-      _appendBotMessage(replyMsg);
-      return;
-    }
-
-    // 2. Conversational pre-filter: greetings handled locally, no API call
+    // 1. Conversational pre-filter: greetings handled locally, no API call
     if (_isConversationalCommentary(lower)) {
       _appendBotMessage(_botMsg(_generateConversationalResponse(lower, isBangla)));
       return;
     }
 
-    // 3. Intent-aware parsing through the backend AI gateway (DeepSeek by default).
+    // 2. Intent-aware parsing through the backend AI gateway.
     //    The model returns ONE structured JSON object — never free-form replies.
     try {
       final aiService = _ref.read(aiApiServiceProvider);
@@ -281,6 +246,11 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
         text: trimmed,
         timezone: _deviceTimezone,
       );
+
+      if (parsed.needsClarification) {
+        _appendBotMessage(_botMsg(parsed.clarifyingQuestion!));
+        return;
+      }
 
       if (parsed.intent == ParsedReminderData.intentList) {
         _handleListIntent(isBangla);
@@ -460,7 +430,6 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
   void _appendBotMessage(ChatMessage botMsg) {
     final nextList = [...state.messages, botMsg];
     state = state.copyWith(messages: nextList, isThinking: false);
-    ChatArchiveService.instance.saveActiveMessages(nextList);
   }
 
   bool _isConversationalCommentary(String lower) {
@@ -496,22 +465,22 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
   String _generateConversationalResponse(String lower, bool isBangla) {
     if (lower.contains('thank') || lower.contains('ধন্যবাদ')) {
       return isBangla
-          ? 'আপনাকে স্বাগতম! আপনার কোনো রিমাইন্ডার বা শিডিউল থাকলে জানান।'
-          : "You're welcome! Let me know if you need to schedule a reminder or note.";
+          ? 'স্বাগতম। নতুন কোনো রিমাইন্ডার বা নোট থাকলে জানান।'
+          : 'You are welcome. Tell me whenever you want to set an alarm or note.';
     }
     if (lower.contains('how are you') || lower.contains('কেমন আছো')) {
       return isBangla
-          ? 'আমি দারুণ আছি! আপনার দিনটি সাজাতে কীভাবে সাহায্য করতে পারি?'
-          : "I'm running smoothly! How can I assist you with your day?";
+          ? 'সব ঠিকঠাক চলছে। আজ কী মনে করিয়ে দিতে হবে?'
+          : 'Ready when you are. What should I remind you about today?';
     }
     if (lower.contains('who are you') || lower.contains('কে তুমি')) {
       return isBangla
-          ? 'আমি পিঙ্গো — আপনার ব্যক্তিগত প্রাইভেসি-ফার্স্ট অ্যাসিস্ট্যান্ট।'
-          : "I'm Pingo — your minimalist, privacy-first conversational memory and reminder assistant.";
+          ? 'আমি পিঙ্গো, আপনার ব্যক্তিগত রিমাইন্ডার এবং ডকুমেন্ট সহকারী।'
+          : 'I am Pingo, your personal reminder and document ledger.';
     }
     return isBangla
-        ? 'হ্যালো! আমি প্রস্তুত। আপনি যেকোনো রিমাইন্ডার বা ডকুমেন্ট যোগ করতে পারেন।'
-        : 'Hello! Ready to help. You can tell me to set a reminder or attach a document.';
+        ? 'রিমাইন্ডার লিখুন বা বলুন, অথবা ডকুমেন্ট যুক্ত করুন।'
+        : 'Type or speak a reminder, or attach a document.';
   }
 
   String _inferCategoryFromFilename(String name) {

@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 import '../typography/app_typography.dart';
 
-/// Architectural Minimalist ThemeData specifications.
-/// Monochromatic ink & paper aesthetic with titanium highlights and hairline borders.
+/// Unslop Ink & Ledger ThemeData specification.
+/// Single neutral ramp, weights 400–600, nested radii (8/12/16), zero glows.
 class AppTheme {
   AppTheme._();
 
@@ -16,24 +16,24 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark, // Default to architectural dark ink
-      primaryColor: AppColors.titanium,
+      brightness: Brightness.dark,
+      primaryColor: AppColors.signalAmber,
       scaffoldBackgroundColor: AppColors.inkBlack,
       textTheme: textTheme,
       colorScheme: const ColorScheme.dark(
-        primary: AppColors.titanium,
-        secondary: AppColors.paperWhite,
-        surface: AppColors.inkSurface,
+        primary: AppColors.signalAmber,
+        secondary: AppColors.paperMuted,
+        surface: AppColors.inkCard,
         error: AppColors.overdue,
         onPrimary: AppColors.inkBlack,
         onSurface: AppColors.paperWhite,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.inkBlack,
+        backgroundColor: AppColors.inkDeep,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: AppTypography.headlineSmall(color: AppColors.paperWhite),
-        iconTheme: const IconThemeData(color: AppColors.paperWhite),
+        iconTheme: const IconThemeData(color: AppColors.paperMuted, size: 18),
       ),
       cardTheme: CardThemeData(
         color: AppColors.inkCard,
@@ -47,38 +47,36 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.inkSurface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.titanium, width: 1.2),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.inkBorderActive, width: 1),
         ),
         hintStyle: AppTypography.bodyMedium(color: AppColors.paperSubtle),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AppColors.titanium,
+        backgroundColor: AppColors.paperWhite,
         foregroundColor: AppColors.inkBlack,
         elevation: 0,
       ),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.inkSurface,
+        backgroundColor: AppColors.inkCard,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           side: BorderSide(color: AppColors.inkBorder, width: 1),
         ),
       ),
     );
   }
 
-  static ThemeData get darkTheme {
-    return lightTheme; // In Architectural Minimalist, both modes honor the dark ink aesthetic
-  }
+  static ThemeData get darkTheme => lightTheme;
 }

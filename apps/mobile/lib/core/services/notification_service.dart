@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -135,6 +136,36 @@ class NotificationService {
     }
   }
 
+  /// Ensures reminder access right before scheduling one.
+  ///
+  /// Called contextually from [scheduleReminder]: Android only shows the
+  /// runtime dialog while the user is doing the thing that needs it. If the
+  /// user has already denied notifications, opens the app's system settings
+  /// page so access can be granted manually without hunting for it.
+  ///
+  /// Returns true when notifications are granted.
+  Future<bool> ensureReminderPermissions() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+
+    final status = await ph.Permission.notification.status;
+    if (status.isGranted || status.isLimited) {
+      // Already granted — only make sure exact alarms are permitted.
+      await ph.Permission.scheduleExactAlarm.request();
+      return true;
+    }
+
+    final granted = await ph.Permission.notification.request();
+    if (!granted.isGranted && !granted.isLimited) {
+      // Dialog denied or permanently dismissed — take the user straight
+      // to the app settings page.
+      await ph.openAppSettings();
+      return false;
+    }
+
+    await ph.Permission.scheduleExactAlarm.request();
+    return true;
+  }
+
   /// Schedules a punctual notification at the specified [scheduledDate].
   /// Alarms are always scheduled for the future in Android AlarmManager and NEVER trigger immediately at creation time.
   Future<void> scheduleReminder({
@@ -148,6 +179,10 @@ class NotificationService {
       await initialize();
     }
 
+    // Contextual access check: the runtime dialog can only surface while
+    // the user is actively setting the reminder. Never schedule into a void.
+    await ensureReminderPermissions();
+
     // Ensure 32-bit positive integer for Android PendingIntent
     final safeId = id.abs() % 2147483647;
 
@@ -156,7 +191,7 @@ class NotificationService {
 
     final displayBody = (body.isNotEmpty && body != 'Scheduled alert from Pingo')
         ? body
-        : '⏰ $timeStr · $dateStr';
+        : '$timeStr · $dateStr';
 
     final styleInfo = BigTextStyleInformation(
       displayBody,

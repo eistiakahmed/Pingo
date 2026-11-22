@@ -1,11 +1,19 @@
 # Feature Specification: Minimalist Privacy-First Conversational Core
 
 **Document ID**: `docs/features/27_minimalist_privacy_first_conversational_core_spec.md`  
-**Version**: `2.0.0` (APPROVED & IMPLEMENTATION COMPLETE)  
+**Version**: `3.0.0` (UNSLOP 9-PASS HOROLOGICAL LEDGER EDITION)  
 **Primary Architect**: Principal System Architect & Lead UI/UX Engineer  
-**Target Platform**: Flutter Mobile (Android & iOS)  
+**Target Platform**: Flutter Mobile (Android & iOS) & Web APK Portal  
 
 ---
+
+## 0. Unslop 5-Line Craft Direction
+
+- **Product**: A bilingual (Bangla & English) personal memory assistant that turns quick voice notes, messages, and documents into exact, confirmed phone alarms.
+- **Character**: Quiet, exact, tactile.
+- **World**: Late-night desk ledger and precision pocket timepiece — matte ink surfaces (`#07080D` to `#1A1E28`), crisp paper-white typography (`#EEF0F5`), hairline borders (`#222734`), and one signal-amber accent (`#E5A93C`).
+- **Moments**: The inline **Horological Alarm Ticket** (confirmation slip inside chat bubbles with tabular time figures and tactile schedule/discard controls) and the **Encrypted Document Slip**.
+- **Signature**: A 6px semantic status dot (amber `#E5A93C` while pending confirmation, sage `#4CC38A` once scheduled, crimson `#E5484D` when overdue) paired with a tabular timestamp (`HH:MM · DD MMM`).
 
 ## 1. Executive Summary & Core Architectural Invariants
 

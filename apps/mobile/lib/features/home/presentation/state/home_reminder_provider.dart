@@ -130,7 +130,7 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
       NotificationService.instance.scheduleReminder(
         id: item.id.hashCode,
         title: item.title,
-        body: '⏰ $timeStr · $dateStr',
+        body: '$timeStr · $dateStr',
         scheduledDate: item.dueAt,
         isUrgent: item.category == ReminderCategory.medicine ||
             item.priority == ReminderPriority.important,
@@ -151,7 +151,7 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
       NotificationService.instance.scheduleReminder(
         id: item.id.hashCode,
         title: item.title,
-        body: '⏰ $timeStr · $dateStr',
+        body: '$timeStr · $dateStr',
         scheduledDate: item.dueAt,
         isUrgent: item.category == ReminderCategory.medicine ||
             item.priority == ReminderPriority.important,
@@ -176,7 +176,7 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
           NotificationService.instance.scheduleReminder(
             id: updated.id.hashCode,
             title: updated.title,
-            body: '⏰ $timeStr · $dateStr (Snoozed)',
+            body: '$timeStr · $dateStr (Snoozed)',
             scheduledDate: updated.dueAt,
           );
           return updated;
@@ -201,7 +201,7 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
             NotificationService.instance.scheduleReminder(
               id: r.id.hashCode,
               title: r.title,
-              body: '⏰ $timeStr · $dateStr',
+              body: '$timeStr · $dateStr',
               scheduledDate: r.dueAt,
             );
           }
@@ -213,13 +213,36 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     _persistAndSync();
   }
 
-  /// Delete a reminder
+  /// Delete a reminder and push a tombstone to the cloud so it never resurrects
   void deleteReminder(String id) {
+    final deletedItem =
+        state.reminders.where((r) => r.id == id).firstOrNull;
     NotificationService.instance.cancelReminder(id.hashCode);
     state = state.copyWith(
       reminders: state.reminders.where((r) => r.id != id).toList(),
     );
-    _persistAndSync();
+    LocalStorageService.instance.saveReminders(state.reminders);
+    final ref = _ref;
+    if (ref != null) {
+      final syncApi = ref.read(syncApiServiceProvider);
+      if (deletedItem != null) {
+        syncApi.pushSync(
+          reminders: [
+            EncryptedReminderDto(
+              id: deletedItem.id,
+              ciphertext: CryptoHelper.toBase64(deletedItem.title),
+              iv: CryptoHelper.toBase64('0123456789ab'),
+              authTag: CryptoHelper.toBase64('abcdefghijklmnop'),
+              dueAt: deletedItem.dueAt,
+              isCompleted: deletedItem.isDone,
+              version: 2,
+              deletedAt: DateTime.now().toUtc(),
+            ),
+          ],
+        );
+      }
+      pushToServer(syncApi);
+    }
   }
 
   /// Pushes all local reminders to server with Zero-Knowledge encryption
@@ -262,7 +285,14 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
       final res = await syncService.pullSync(since: since);
       final now = DateTime.now();
 
-      final remoteReminders = res.reminders.map((dto) {
+      final deletedIds = res.reminders
+          .where((dto) => dto.deletedAt != null)
+          .map((dto) => dto.id)
+          .toSet();
+
+      final remoteReminders = res.reminders
+          .where((dto) => dto.deletedAt == null)
+          .map((dto) {
         String decodedTitle;
         try {
           decodedTitle = CryptoHelper.fromBase64(dto.ciphertext);
@@ -283,8 +313,11 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
         return now.difference(r.dueAt).inDays < 14;
       }).toList();
 
-      // Merge avoiding duplicate IDs
-      final currentMap = {for (var r in state.reminders) r.id: r};
+      // Merge avoiding duplicate IDs and removing server-deleted tombstones
+      final currentMap = {
+        for (var r in state.reminders)
+          if (!deletedIds.contains(r.id)) r.id: r,
+      };
       for (final remote in remoteReminders) {
         currentMap[remote.id] = remote;
       }

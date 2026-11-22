@@ -59,6 +59,7 @@ class ChatMessage {
     String? reminderId,
     String? reminderTitle,
     DateTime? reminderDueAt,
+    bool clearReminder = false,
     bool? isDone,
     List<String>? suggestedActions,
     String? documentTitle,
@@ -76,9 +77,9 @@ class ChatMessage {
       text: text ?? this.text,
       isUser: isUser ?? this.isUser,
       timestamp: timestamp ?? this.timestamp,
-      reminderId: reminderId ?? this.reminderId,
-      reminderTitle: reminderTitle ?? this.reminderTitle,
-      reminderDueAt: reminderDueAt ?? this.reminderDueAt,
+      reminderId: clearReminder ? null : (reminderId ?? this.reminderId),
+      reminderTitle: clearReminder ? null : (reminderTitle ?? this.reminderTitle),
+      reminderDueAt: clearReminder ? null : (reminderDueAt ?? this.reminderDueAt),
       isDone: isDone ?? this.isDone,
       suggestedActions: suggestedActions ?? this.suggestedActions,
       documentTitle: documentTitle ?? this.documentTitle,
@@ -88,8 +89,12 @@ class ChatMessage {
       filePath: filePath ?? this.filePath,
       fileSize: fileSize ?? this.fileSize,
       isPendingConfirmation: isPendingConfirmation ?? this.isPendingConfirmation,
-      pendingReminderCategory: pendingReminderCategory ?? this.pendingReminderCategory,
-      pendingReminderPriority: pendingReminderPriority ?? this.pendingReminderPriority,
+      pendingReminderCategory: clearReminder
+          ? null
+          : (pendingReminderCategory ?? this.pendingReminderCategory),
+      pendingReminderPriority: clearReminder
+          ? null
+          : (pendingReminderPriority ?? this.pendingReminderPriority),
     );
   }
 

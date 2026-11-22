@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/services/voice_recognition_service.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../domain/chat_message.dart';
 import '../state/pingo_chat_provider.dart';
 import '../widgets/chat_message_bubble.dart';
@@ -14,15 +15,10 @@ import '../widgets/tech_canvas_background.dart';
 import '../widgets/typing_indicator_widget.dart';
 import 'my_reminders_screen.dart';
 
-/// WhatsApp-style conversational home screen:
-/// 1. Fresh, empty chat on every launch (reminders stay saved separately).
-/// 2. Single screen: message list with centred date chips + a compact
-///    composer with a large, obvious microphone button.
-/// 3. Tap-to-record voice capture: pulsing mic, visible timer, tap again to
-///    stop & send — the transcript becomes the user's own bubble.
-/// 4. Top-bar menu: "New chat" (clears the screen) and "My reminders"
-///    (dedicated screen to edit/delete saved reminders).
-/// 5. Reminders render as ONE small confirmation bubble, never big cards.
+/// Conversational Ledger Home Screen — Unslop 9-Pass Craft Edition.
+/// - Quiet Ink neutral ramp (#0B0D14 background, #07080D header, #11141C surfaces).
+/// - 4px spatial rhythm, 18px uniform line icons, weights 400–600.
+/// - Structured 16px desk composer with nested 12px action keycap.
 class PingoHomeScreen extends ConsumerStatefulWidget {
   const PingoHomeScreen({super.key});
 
@@ -35,6 +31,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  bool _hasInputText = false;
   bool _isVoiceRecording = false;
   String _transcribedVoiceText = '';
   Timer? _recTimer;
@@ -45,9 +42,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _inputController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    _inputController.addListener(_onInputChanged);
 
     _pulseController = AnimationController(
       vsync: this,
@@ -55,8 +50,17 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      NotificationService.instance.requestPermissions();
+      NotificationService.instance.initialize();
     });
+  }
+
+  void _onInputChanged() {
+    final nextHasText = _inputController.text.trim().isNotEmpty;
+    if (nextHasText != _hasInputText && mounted) {
+      setState(() {
+        _hasInputText = nextHasText;
+      });
+    }
   }
 
   @override
@@ -64,6 +68,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     WidgetsBinding.instance.removeObserver(this);
     _recTimer?.cancel();
     _pulseController.dispose();
+    _inputController.removeListener(_onInputChanged);
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -71,7 +76,6 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Strict background suspension: cancel speech & audio services when app is paused
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
@@ -115,7 +119,6 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     _scrollToBottom();
   }
 
-  /// Native File Picker invocation — eliminates preset menus
   Future<void> _pickNativeDocument() async {
     HapticFeedback.lightImpact();
     try {
@@ -138,7 +141,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     }
   }
 
-  // ───── Tap-to-record voice capture (WhatsApp voice-note style) ─────
+  // ───── Tap-to-record voice capture ─────
 
   Future<void> _toggleVoiceCapture() async {
     if (_isVoiceRecording) {
@@ -150,6 +153,16 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
 
   Future<void> _startVoiceCapture() async {
     HapticFeedback.mediumImpact();
+    final ready = await VoiceRecognitionService.instance.initialize();
+    if (!ready) {
+      _resetRecordingState();
+      return;
+    }
+
+    final langCode = ref.read(pingoChatProvider).language;
+    final localeId = VoiceRecognitionService.instance.findBestLocale(langCode);
+
+    if (!mounted) return;
     setState(() {
       _isVoiceRecording = true;
       _transcribedVoiceText = '';
@@ -164,10 +177,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
       }
     });
 
-    final langCode = ref.read(pingoChatProvider).language;
-    final localeId = VoiceRecognitionService.instance.findBestLocale(langCode);
-
-    await VoiceRecognitionService.instance.startListening(
+    final started = await VoiceRecognitionService.instance.startListening(
       localeId: localeId,
       onResult: (words) {
         if (mounted) {
@@ -177,10 +187,11 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
         }
       },
     );
+    if (!started) {
+      _resetRecordingState();
+    }
   }
 
-  /// Tap again to stop: the transcribed text becomes the user's bubble
-  /// and is submitted for parsing.
   Future<void> _stopVoiceAndSend() async {
     HapticFeedback.lightImpact();
     _recTimer?.cancel();
@@ -204,8 +215,8 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
         SnackBar(
           content: Text(
             isBangla
-                ? 'কোনো কথা ধরা পড়েনি। আবার চেষ্টা করুন।'
-                : 'Nothing captured. Try again.',
+                ? 'কোনো কথা ধরা পড়েনি, আবার চেষ্টা করুন'
+                : 'Nothing captured, try again',
           ),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
@@ -214,7 +225,6 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     }
   }
 
-  /// Document expiry alert configuration via native date picker
   Future<void> _promptDatePickerForExpiry(ChatMessage msg) async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -226,10 +236,10 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF0284C7),
-              onPrimary: Colors.white,
-              surface: Color(0xFF0F172A),
-              onSurface: Colors.white,
+              primary: AppColors.signalAmber,
+              onPrimary: AppColors.inkBlack,
+              surface: AppColors.inkCard,
+              onSurface: AppColors.paperWhite,
             ),
           ),
           child: child!,
@@ -259,39 +269,36 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
   Widget build(BuildContext context) {
     final chatState = ref.watch(pingoChatProvider);
     final isBangla = chatState.language == 'bn';
-    final hasInputText = _inputController.text.trim().isNotEmpty;
 
     final messageItems = _buildMessageItems(chatState.messages, isBangla);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B141A),
+      backgroundColor: AppColors.inkBlack,
       body: TechCanvasBackground(
         child: SafeArea(
           child: Column(
             children: [
               _buildTopBar(isBangla),
 
-              // Main Area: pure wallpaper canvas when empty (WhatsApp-style),
-              // chat stream otherwise
               Expanded(
                 child: chatState.messages.isEmpty && !chatState.isThinking
                     ? const SizedBox.expand()
                     : ListView(
                         controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                         children: [
                           ...messageItems,
                           if (chatState.isThinking)
                             TypingIndicatorWidget(
                               statusText: isBangla
-                                  ? 'পিঙ্গো ভাবছে...'
-                                  : 'Pingo is thinking...',
+                                  ? 'পিঙ্গো ভাবছে'
+                                  : 'Pingo is thinking',
                             ),
                         ],
                       ),
               ),
 
-              _buildComposer(isBangla, hasInputText),
+              _buildComposer(isBangla, _hasInputText),
             ],
           ),
         ),
@@ -331,59 +338,61 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
 
   Widget _buildTopBar(bool isBangla) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+      height: 56,
+      padding: const EdgeInsets.only(left: 16, right: 8),
       decoration: const BoxDecoration(
-        color: Color(0xFF131C27),
-        border: Border(bottom: BorderSide(color: Color(0xFF1D2836), width: 1)),
+        color: AppColors.inkDeep,
+        border: Border(bottom: BorderSide(color: AppColors.inkBorder, width: 1)),
       ),
       child: Row(
         children: [
-          // Avatar: penguin mascot in a gradient ring with ambient glow.
-          // Image is authored on a yellow canvas with the penguin's head
-          // slightly above centre — frame it there.
+          // Flat horological glyph mark in a quiet 32x32 bordered keycap
           Container(
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              color: AppColors.inkCard,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.inkBorder, width: 1),
             ),
-            padding: const EdgeInsets.all(2),
-            child: Container(
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF0D1420),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Image.asset(
-                'assets/images/penguin_avatar.png',
-                fit: BoxFit.cover,
-                alignment: const Alignment(0, -0.55),
-                filterQuality: FilterQuality.medium,
-              ),
+            child: const Icon(
+              Icons.schedule_rounded,
+              color: AppColors.paperWhite,
+              size: 18,
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Pingo',
-              style: TextStyle(
-                fontSize: 17.5,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFFF1F5F9),
-                letterSpacing: -0.3,
-              ),
+          Expanded(
+            child: Row(
+              children: [
+                const Text(
+                  'Pingo',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.paperWhite,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Signature 6px live status dot
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.success,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isBangla ? 'বাংলা' : 'EN',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.paperSubtle,
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -391,12 +400,13 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
           PopupMenuButton<String>(
             icon: const Icon(
               Icons.more_vert_rounded,
-              color: Color(0xFF94A3B8),
+              color: AppColors.paperMuted,
+              size: 18,
             ),
-            color: const Color(0xFF131B2A),
+            color: AppColors.inkCard,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: Color(0xFF1E293B)),
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: AppColors.inkBorder, width: 1),
             ),
             itemBuilder: (_) => [
               PopupMenuItem(
@@ -418,8 +428,8 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                 value: 'lang_bn',
                 child: _menuItem(
                   isBangla
-                      ? Icons.check_box_rounded
-                      : Icons.check_box_outline_blank_rounded,
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_off_rounded,
                   'বাংলা',
                 ),
               ),
@@ -427,8 +437,8 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                 value: 'lang_en',
                 child: _menuItem(
                   !isBangla
-                      ? Icons.check_box_rounded
-                      : Icons.check_box_outline_blank_rounded,
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_off_rounded,
                   'English',
                 ),
               ),
@@ -460,14 +470,17 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
   Widget _menuItem(IconData icon, String label) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: const Color(0xFF38BDF8)),
-        const SizedBox(width: 12),
+        SizedBox(
+          width: 18,
+          child: Icon(icon, size: 18, color: AppColors.paperMuted),
+        ),
+        const SizedBox(width: 10),
         Text(
           label,
           style: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFFF1F5F9),
+            fontWeight: FontWeight.w400,
+            color: AppColors.paperWhite,
           ),
         ),
       ],
@@ -478,132 +491,97 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
 
   Widget _buildComposer(bool isBangla, bool hasInputText) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: _isVoiceRecording
           ? _buildRecordingBar(isBangla)
           : _buildInputBar(isBangla, hasInputText),
     );
   }
 
-  /// Active recording: pulsing mic, visible timer, live transcript preview.
+  /// Active recording bar: nested radius 16px outer / 12px inner keycap,
+  /// subtle opacity indicator on the 6px recording dot, tabular timer.
   Widget _buildRecordingBar(bool isBangla) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1118),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFEF4444).withValues(alpha: 0.2),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.inkCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.inkBorderActive, width: 1),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.all(4),
       child: Row(
         children: [
-          // Pulsing microphone
-          ScaleTransition(
-            scale: Tween<double>(begin: 1.0, end: 1.18).animate(
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.inkSurface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.mic_rounded,
+              color: AppColors.overdue,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          FadeTransition(
+            opacity: Tween<double>(begin: 0.35, end: 1.0).animate(
               CurvedAnimation(
                 parent: _pulseController,
-                curve: Curves.easeInOut,
+                curve: Curves.easeOutCubic,
               ),
             ),
             child: Container(
-              width: 42,
-              height: 42,
+              width: 6,
+              height: 6,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFFEF4444),
-              ),
-              child: const Icon(
-                Icons.mic_rounded,
-                color: Colors.white,
-                size: 22,
+                color: AppColors.overdue,
               ),
             ),
           ),
-          const SizedBox(width: 10),
-
-          // Recording indicator + timer
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFFEF4444),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    isBangla ? 'রেকর্ড হচ্ছে' : 'Recording',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                      color: Color(0xFFFCA5A5),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 1),
-              Text(
-                _formatRecTimer(_recElapsed),
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                  color: Color(0xFFE2E8F0),
-                ),
-              ),
-            ],
+          const SizedBox(width: 8),
+          Text(
+            _formatRecTimer(_recElapsed),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              fontFeatures: [FontFeature.tabularFigures()],
+              color: AppColors.paperWhite,
+            ),
           ),
-          const SizedBox(width: 10),
-
-          // Live transcript preview
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               _transcribedVoiceText.isNotEmpty
                   ? _transcribedVoiceText
-                  : (isBangla ? 'কথা বলুন…' : 'Speak now…'),
+                  : (isBangla ? 'কথা বলুন' : 'Listening'),
               style: TextStyle(
                 color: _transcribedVoiceText.isNotEmpty
-                    ? const Color(0xFFF1F5F9)
-                    : const Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
+                    ? AppColors.paperWhite
+                    : AppColors.paperSubtle,
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
                 height: 1.45,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-
           const SizedBox(width: 8),
-
-          // Tap again to stop & send
           GestureDetector(
             onTap: _toggleVoiceCapture,
             child: Container(
-              width: 42,
-              height: 42,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFEF4444),
-                border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+                color: AppColors.paperWhite,
+                borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
                 Icons.stop_rounded,
-                color: Colors.white,
-                size: 24,
+                color: AppColors.inkBlack,
+                size: 18,
               ),
             ),
           ),
@@ -612,40 +590,31 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     );
   }
 
-  /// Idle composer: [attach] [text field] [large mic → send when typing]
+  /// Idle composer: outer radius 16px, 4px padding, inner 36x36 button radius 12px.
   Widget _buildInputBar(bool isBangla, bool hasInputText) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF111726),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFF1D263B), width: 1.1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.inkCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.inkBorder, width: 1),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.all(4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Document attachment
           InkWell(
             onTap: _pickNativeDocument,
-            borderRadius: BorderRadius.circular(20),
-            child: const Padding(
-              padding: EdgeInsets.all(9),
+            borderRadius: BorderRadius.circular(12),
+            child: const SizedBox(
+              width: 36,
+              height: 36,
               child: Icon(
                 Icons.attach_file_rounded,
-                color: Color(0xFF38BDF8),
-                size: 21,
+                color: AppColors.paperMuted,
+                size: 18,
               ),
             ),
           ),
-
-          // Text field
           Expanded(
             child: TextField(
               controller: _inputController,
@@ -654,73 +623,57 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
               minLines: 1,
               textInputAction: TextInputAction.newline,
               style: const TextStyle(
-                color: Color(0xFFF8FAFC),
+                color: AppColors.paperWhite,
                 fontSize: 15,
+                fontWeight: FontWeight.w400,
                 height: 1.45,
               ),
               decoration: InputDecoration(
+                filled: false,
                 hintText: isBangla
-                    ? 'বার্তা বা রিমাইন্ডার লিখুন…'
-                    : 'Message or reminder…',
-                hintStyle: TextStyle(
-                  color: const Color(0xFF94A3B8).withValues(alpha: 0.65),
+                    ? 'রিমাইন্ডার লিখুন'
+                    : 'Write a reminder',
+                hintStyle: const TextStyle(
+                  color: AppColors.paperSubtle,
                   fontSize: 14,
+                  fontWeight: FontWeight.w400,
                 ),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               ),
             ),
           ),
-
           const SizedBox(width: 4),
-
-          // Large, obvious mic — swaps to send while typing (WhatsApp-style)
           GestureDetector(
             onTap: hasInputText
                 ? () => _handleSend(_inputController.text)
                 : _toggleVoiceCapture,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 44,
-              height: 44,
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: hasInputText
-                    ? const LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: hasInputText ? null : const Color(0xFF274257),
+                borderRadius: BorderRadius.circular(12),
+                color: hasInputText
+                    ? AppColors.paperWhite
+                    : AppColors.inkSurface,
                 border: Border.all(
                   color: hasInputText
-                      ? Colors.white.withValues(alpha: 0.22)
-                      : const Color(0xFF3A5670),
+                      ? AppColors.paperWhite
+                      : AppColors.inkBorder,
                   width: 1,
                 ),
-                boxShadow: hasInputText
-                    ? [
-                        BoxShadow(
-                          color:
-                              const Color(0xFF3B82F6).withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
               ),
               child: Icon(
-                hasInputText ? Icons.arrow_upward_rounded : Icons.mic_rounded,
-                color: hasInputText ? Colors.white : const Color(0xFFA7C8E8),
-                size: 22,
+                hasInputText ? Icons.arrow_upward_rounded : Icons.mic_none_rounded,
+                color: hasInputText
+                    ? AppColors.inkBlack
+                    : AppColors.paperWhite,
+                size: 18,
               ),
             ),
           ),
@@ -728,5 +681,4 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
       ),
     );
   }
-
 }

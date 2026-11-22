@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pingo_mobile/core/constants/app_constants.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
 import 'package:pingo_mobile/core/typography/app_typography.dart';
 import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
 
-/// Full manual reminder creation and editing sheet.
-/// Fulfills requirements R-01, R-02, R-05, R-06 (Full manual control).
+/// Manual reminder creation and editing sheet — Unslop Ink & Ledger System.
+/// Fixes inverted white-on-white button contrast, uses 4px grid spacing,
+/// 18px line icons, tabular numerals, and sentence-case labels.
 class EditReminderScreen extends StatefulWidget {
   final ReminderItem? initialItem;
   final Function(ReminderItem savedItem) onSave;
@@ -53,10 +53,10 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
 
   final List<String?> _repeatOptions = [
     null,
-    'প্রতিদিন (Daily)',
-    'প্রতি সপ্তাহে (Weekly)',
-    'প্রতি মাসে (Monthly)',
-    'প্রতি বছর (Yearly)',
+    'Daily',
+    'Weekly',
+    'Monthly',
+    'Yearly',
   ];
 
   @override
@@ -66,13 +66,17 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
     _titleController = TextEditingController(text: item?.title ?? '');
     _notesController = TextEditingController(text: item?.notes ?? '');
 
-    final initialDateTime = item?.dueAt ?? DateTime.now().add(const Duration(hours: 1));
-    _selectedDate = DateTime(initialDateTime.year, initialDateTime.month, initialDateTime.day);
+    final initialDateTime =
+        item?.dueAt ?? DateTime.now().add(const Duration(hours: 1));
+    _selectedDate = DateTime(
+        initialDateTime.year, initialDateTime.month, initialDateTime.day);
     _selectedTime = TimeOfDay.fromDateTime(initialDateTime);
 
     _selectedCategory = item?.category ?? ReminderCategory.other;
     _selectedPriority = item?.priority ?? ReminderPriority.normal;
-    _selectedRepeat = item?.repeatRule;
+    _selectedRepeat = _repeatOptions.contains(item?.repeatRule)
+        ? item?.repeatRule
+        : null;
   }
 
   @override
@@ -116,9 +120,12 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
     );
 
     final item = ReminderItem(
-      id: widget.initialItem?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.initialItem?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
-      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      notes: _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
       dueAt: dueAt,
       category: _selectedCategory,
       priority: _selectedPriority,
@@ -130,7 +137,7 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
     Navigator.of(context).pop();
   }
 
-  Color _getCategoryColor(ReminderCategory category) {
+  Color _getCategoryDotColor(ReminderCategory category) {
     switch (category) {
       case ReminderCategory.medicine:
         return AppColors.categoryMedicine;
@@ -143,46 +150,44 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
       case ReminderCategory.birthday:
         return AppColors.categoryBirthday;
       case ReminderCategory.other:
-        return AppColors.brandSecondary;
+        return AppColors.paperSubtle;
     }
   }
 
   String _getCategoryLabel(ReminderCategory category) {
     switch (category) {
       case ReminderCategory.medicine:
-        return 'ওষুধ';
+        return 'Medicine';
       case ReminderCategory.bill:
-        return 'বিল';
+        return 'Bill';
       case ReminderCategory.work:
-        return 'অফিস';
+        return 'Work';
       case ReminderCategory.personal:
-        return 'ব্যক্তিগত';
+        return 'Personal';
       case ReminderCategory.birthday:
-        return 'জন্মদিন';
+        return 'Birthday';
       case ReminderCategory.other:
-        return 'অন্যান্য';
+        return 'General';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isEditing = widget.initialItem != null;
 
     return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppConstants.radiusLarge),
-        ),
+      decoration: const BoxDecoration(
+        color: AppColors.inkCard,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(top: BorderSide(color: AppColors.inkBorder, width: 1)),
       ),
       padding: EdgeInsets.only(
-        left: AppConstants.spacing20,
-        right: AppConstants.spacing20,
-        top: AppConstants.spacing16,
+        left: 20,
+        right: 20,
+        top: 16,
         bottom: MediaQuery.of(context).viewInsets.bottom +
             MediaQuery.of(context).padding.bottom +
-            AppConstants.spacing20,
+            20,
       ),
       child: Form(
         key: _formKey,
@@ -191,83 +196,96 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Drag Handle
               Center(
                 child: Container(
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                    borderRadius: BorderRadius.circular(AppConstants.radiusFull),
+                    color: AppColors.inkBorderActive,
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
-              const SizedBox(height: AppConstants.spacing16),
+              const SizedBox(height: 16),
 
-              // Header Title and Close
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    isEditing ? 'রিমাইন্ডার এডিট করুন' : 'নতুন রিমাইন্ডার',
-                    style: AppTypography.headlineSmall(
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                    isEditing ? 'Edit alarm' : 'New alarm',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.paperWhite,
                     ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: 'বাতিল',
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: AppColors.paperMuted,
+                    ),
+                    tooltip: 'Close',
                   ),
                 ],
               ),
-              const SizedBox(height: AppConstants.spacing16),
+              const SizedBox(height: 16),
 
-              // Title Field
-              Text(
-                'কাজের শিরোনাম *',
-                style: AppTypography.labelSmall(
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              const Text(
+                'Title',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.paperMuted,
                 ),
               ),
-              const SizedBox(height: AppConstants.spacing6),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _titleController,
-                validator: (val) => val == null || val.trim().isEmpty ? 'শিরোনাম আবশ্যক' : null,
-                style: AppTypography.titleMedium(
-                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                ),
+                validator: (val) =>
+                    val == null || val.trim().isEmpty ? 'Title required' : null,
+                style: AppTypography.bodyMedium(color: AppColors.paperWhite),
                 decoration: const InputDecoration(
-                  hintText: 'যেমন: কাল সকালে ডাক্তারের অ্যাপয়েন্টমেন্ট',
+                  hintText: 'Doctor appointment',
                 ),
               ),
-              const SizedBox(height: AppConstants.spacing16),
+              const SizedBox(height: 16),
 
-              // Date & Time Picker Row
               Row(
                 children: [
-                  // Date selector tile
                   Expanded(
                     child: InkWell(
                       onTap: _pickDate,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                      borderRadius: BorderRadius.circular(8),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: isDark ? AppColors.darkBg : AppColors.lightBg,
-                          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                          color: AppColors.inkSurface,
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                            color: AppColors.inkBorder,
+                            width: 1,
                           ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.brandPrimary),
+                            const Icon(
+                              Icons.calendar_today_outlined,
+                              size: 18,
+                              color: AppColors.paperMuted,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 DateFormat('d MMM yyyy').format(_selectedDate),
-                                style: AppTypography.bodyMedium(),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w400,
+                                  fontFeatures: [FontFeature.tabularFigures()],
+                                  color: AppColors.paperWhite,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -276,30 +294,39 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: AppConstants.spacing12),
-
-                  // Time selector tile
+                  const SizedBox(width: 12),
                   Expanded(
                     child: InkWell(
                       onTap: _pickTime,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                      borderRadius: BorderRadius.circular(8),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: isDark ? AppColors.darkBg : AppColors.lightBg,
-                          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                          color: AppColors.inkSurface,
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                            color: AppColors.inkBorder,
+                            width: 1,
                           ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.access_time_rounded, size: 18, color: AppColors.brandPrimary),
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 18,
+                              color: AppColors.paperMuted,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 _selectedTime.format(context),
-                                style: AppTypography.bodyMedium(),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w400,
+                                  fontFeatures: [FontFeature.tabularFigures()],
+                                  color: AppColors.paperWhite,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -310,146 +337,206 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: AppConstants.spacing16),
+              const SizedBox(height: 16),
 
-              // Category Selector Chips
-              Text(
-                'ক্যাটাগরি',
-                style: AppTypography.labelSmall(
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              const Text(
+                'Category',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.paperMuted,
                 ),
               ),
-              const SizedBox(height: AppConstants.spacing8),
+              const SizedBox(height: 8),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: ReminderCategory.values.map((cat) {
                     final isSelected = _selectedCategory == cat;
-                    final color = _getCategoryColor(cat);
+                    final dotColor = _getCategoryDotColor(cat);
 
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        selected: isSelected,
-                        label: Text(_getCategoryLabel(cat)),
-                        labelStyle: AppTypography.labelSmall(
-                          color: isSelected ? Colors.white : color,
+                      child: InkWell(
+                        onTap: () => setState(() => _selectedCategory = cat),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          height: 32,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.inkSurface
+                                : AppColors.inkBlack,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.inkBorderActive
+                                  : AppColors.inkBorder,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: dotColor,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _getCategoryLabel(cat),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w500
+                                      : FontWeight.w400,
+                                  color: isSelected
+                                      ? AppColors.paperWhite
+                                      : AppColors.paperMuted,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        selectedColor: color,
-                        backgroundColor: color.withValues(alpha: 0.1),
-                        side: BorderSide(
-                          color: isSelected ? color : color.withValues(alpha: 0.3),
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                        ),
-                        onSelected: (selected) {
-                          if (selected) setState(() => _selectedCategory = cat);
-                        },
                       ),
                     );
                   }).toList(),
                 ),
               ),
-              const SizedBox(height: AppConstants.spacing16),
+              const SizedBox(height: 16),
 
-              // Recurrence Dropdown
-              Text(
-                'পুনরাবৃত্তি (Repeat Rule)',
-                style: AppTypography.labelSmall(
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              const Text(
+                'Repeat',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.paperMuted,
                 ),
               ),
-              const SizedBox(height: AppConstants.spacing6),
+              const SizedBox(height: 8),
               DropdownButtonFormField<String?>(
                 initialValue: _selectedRepeat,
+                dropdownColor: AppColors.inkSurface,
                 items: _repeatOptions.map((opt) {
                   return DropdownMenuItem<String?>(
                     value: opt,
                     child: Text(
-                      opt ?? 'কোনোটিই নয় (একবার)',
-                      style: AppTypography.bodyMedium(),
+                      opt ?? 'Once',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.paperWhite,
+                      ),
                     ),
                   );
                 }).toList(),
                 onChanged: (val) => setState(() => _selectedRepeat = val),
               ),
-              const SizedBox(height: AppConstants.spacing16),
+              const SizedBox(height: 16),
 
-              // Priority Switch
               SwitchListTile(
                 value: _selectedPriority == ReminderPriority.important,
+                activeThumbColor: AppColors.signalAmber,
                 onChanged: (val) {
                   setState(() {
-                    _selectedPriority = val ? ReminderPriority.important : ReminderPriority.normal;
+                    _selectedPriority = val
+                        ? ReminderPriority.important
+                        : ReminderPriority.normal;
                   });
                 },
                 contentPadding: EdgeInsets.zero,
-                title: Text(
-                  'জরুরি রিমাইন্ডার (Important Alert)',
-                  style: AppTypography.titleMedium(),
-                ),
-                subtitle: Text(
-                  'উচ্চ শব্দ ও অগ্রাধিকারসহ অ্যালার্ট দেওয়া হবে',
-                  style: AppTypography.bodySmall(
-                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                title: const Text(
+                  'Priority alarm',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.paperWhite,
                   ),
                 ),
-                secondary: Icon(
-                  Icons.flag_rounded,
-                  color: _selectedPriority == ReminderPriority.important
-                      ? AppColors.warning
-                      : (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted),
+                subtitle: const Text(
+                  'Use high-priority sound and wake screen',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: AppColors.paperSubtle,
+                  ),
                 ),
               ),
-              const SizedBox(height: AppConstants.spacing16),
+              const SizedBox(height: 16),
 
-              // Optional Notes Textarea
-              Text(
-                'অতিরিক্ত বিবরণ (Notes)',
-                style: AppTypography.labelSmall(
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              const Text(
+                'Notes',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.paperMuted,
                 ),
               ),
-              const SizedBox(height: AppConstants.spacing6),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _notesController,
                 maxLines: 2,
-                style: AppTypography.bodyMedium(),
+                style: AppTypography.bodyMedium(color: AppColors.paperWhite),
                 decoration: const InputDecoration(
-                  hintText: 'যেমন: প্রেসক্রিপশন সাথে নেওয়া',
+                  hintText: 'Bring prescription',
                 ),
               ),
-              const SizedBox(height: AppConstants.spacing24),
+              const SizedBox(height: 24),
 
-              // Action Buttons Row (Delete if edit + Save)
               Row(
                 children: [
                   if (isEditing && widget.onDelete != null) ...[
-                    IconButton(
-                      onPressed: () {
+                    InkWell(
+                      onTap: () {
                         widget.onDelete!();
                         Navigator.of(context).pop();
                       },
-                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.overdue),
-                      tooltip: 'মুছে ফেলুন',
-                    ),
-                    const SizedBox(width: AppConstants.spacing8),
-                  ],
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _handleSave,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.brandPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.inkSurface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.inkBorder,
+                            width: 1,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: AppColors.overdue,
+                          size: 18,
                         ),
                       ),
-                      child: Text(
-                        isEditing ? 'আপডেট করুন' : 'রিমাইন্ডার সংরক্ষণ করুন',
-                        style: AppTypography.labelLarge(color: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: _handleSave,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.paperWhite,
+                          foregroundColor: AppColors.inkBlack,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          isEditing ? 'Update alarm' : 'Save alarm',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.inkBlack,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -462,4 +549,3 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
     );
   }
 }
-

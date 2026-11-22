@@ -43,12 +43,10 @@ class VoiceRecognitionService {
 
     final target = langCode.toLowerCase().trim();
     if (target == 'bn' || target == 'bangla') {
-      // 1. Exact match for Bangladesh
       for (final loc in _supportedLocales) {
         final id = loc.localeId.toLowerCase();
         if (id == 'bn_bd' || id == 'bn-bd') return loc.localeId;
       }
-      // 2. Any Bengali locale (bn_IN, etc.)
       for (final loc in _supportedLocales) {
         if (loc.localeId.toLowerCase().startsWith('bn')) return loc.localeId;
       }
@@ -65,9 +63,8 @@ class VoiceRecognitionService {
     return null;
   }
 
-  /// Starts listening for spoken words and returns transcribed words in real-time.
-  /// Uses continuous dictation mode with extended pause thresholds for long voice notes.
-  Future<void> startListening({
+  /// Starts listening for spoken words and returns `true` when audio capture starts.
+  Future<bool> startListening({
     required Function(String recognizedWords) onResult,
     Function(double soundLevel)? onSoundLevelChange,
     Function(String status)? onStatusChange,
@@ -76,7 +73,7 @@ class VoiceRecognitionService {
     final ready = await initialize();
     if (!ready) {
       debugPrint('[VoiceRecognition] Cannot start listening: Engine not ready');
-      return;
+      return false;
     }
 
     try {
@@ -87,18 +84,19 @@ class VoiceRecognitionService {
           }
         },
         listenOptions: stt.SpeechListenOptions(
-          // Forward the requested locale ('bn_BD' / 'en_US') so the
-          // Bangla/English toggle actually drives recognition. A null value
-          // keeps the engine default.
           localeId: localeId,
+          listenFor: const Duration(minutes: 2),
+          pauseFor: const Duration(seconds: 6),
           listenMode: stt.ListenMode.dictation,
           cancelOnError: false,
           partialResults: true,
         ),
         onSoundLevelChange: onSoundLevelChange,
       );
+      return true;
     } catch (e) {
       debugPrint('[VoiceRecognition] Error starting listen: $e');
+      return false;
     }
   }
 
@@ -123,4 +121,3 @@ class VoiceRecognitionService {
     return _speech.locales();
   }
 }
-

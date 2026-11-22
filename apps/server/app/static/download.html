@@ -3,139 +3,199 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Download Pingo</title>
+  <title>Pingo for Android</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #090D16;
-      --card-bg: #121826;
-      --card-border: #1E293B;
-      --orange: #FF5E1E;
-      --orange-hover: #E04E14;
-      --text-main: #FFFFFF;
-      --text-muted: #94A3B8;
+      --ink-deep: #07080D;
+      --ink-bg: #0B0D14;
+      --ink-card: #11141C;
+      --ink-raised: #1A1E28;
+      --ink-border: #222734;
+      --text-primary: #EEF0F5;
+      --text-secondary: #A3A9B8;
+      --text-muted: #7A8296;
+      --signal-amber: #E5A93C;
+      --status-sage: #4CC38A;
     }
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     body {
-      background: radial-gradient(circle at 50% 20%, #162035 0%, var(--bg) 70%);
-      color: var(--text-main);
+      background-color: var(--ink-bg);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 24px;
+      -webkit-font-smoothing: antialiased;
     }
     .card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 28px;
-      padding: 40px 32px;
-      max-width: 440px;
+      background-color: var(--ink-card);
+      border: 1px solid var(--ink-border);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 420px;
       width: 100%;
-      text-align: center;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 80px rgba(255, 94, 30, 0.08);
     }
-    .logo-badge {
-      width: 76px;
-      height: 76px;
-      background: rgba(255, 94, 30, 0.12);
-      border: 1.5px solid rgba(255, 94, 30, 0.35);
-      border-radius: 50%;
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .logo-mark {
+      width: 36px;
+      height: 36px;
+      background-color: var(--ink-raised);
+      border: 1px solid var(--ink-border);
+      border-radius: 8px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 24px;
+      color: var(--text-primary);
     }
-    .logo-badge span {
-      font-size: 34px;
-      font-weight: 800;
-      color: var(--orange);
+    .brand-block {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--status-sage);
+    }
+    .status-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
     }
     h1 {
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.25;
+      color: var(--text-primary);
       margin-bottom: 8px;
     }
     .subtitle {
-      color: var(--text-muted);
-      font-size: 15px;
+      color: var(--text-secondary);
+      font-size: 14px;
       line-height: 1.5;
-      margin-bottom: 32px;
+      margin-bottom: 20px;
     }
-    .meta-box {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 16px;
-      padding: 14px 20px;
+    .ticket {
+      background-color: var(--ink-raised);
+      border: 1px solid var(--ink-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+    }
+    .ticket-row {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 28px;
-      font-size: 13.5px;
+      align-items: center;
+      font-size: 13px;
+      padding: 4px 0;
+    }
+    .ticket-label {
       color: var(--text-muted);
     }
-    .meta-box strong {
-      color: var(--text-main);
+    .ticket-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
     }
     .download-btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      background: linear-gradient(135deg, var(--orange) 0%, #FF773D 100%);
-      color: #FFFFFF;
+      gap: 8px;
+      height: 44px;
+      background-color: var(--text-primary);
+      color: var(--ink-bg);
       text-decoration: none;
-      font-size: 16px;
-      font-weight: 700;
-      padding: 16px 24px;
-      border-radius: 18px;
-      transition: all 0.2s ease;
-      box-shadow: 0 10px 25px rgba(255, 94, 30, 0.35);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 0 20px;
+      border-radius: 8px;
+      transition: background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .download-btn:hover {
+      background-color: #D8DCE6;
     }
     .download-btn:active {
       transform: scale(0.98);
-      background: var(--orange-hover);
     }
     .instructions {
-      margin-top: 24px;
-      font-size: 12.5px;
+      margin-top: 16px;
+      font-size: 12px;
       color: var(--text-muted);
-      line-height: 1.6;
+      line-height: 1.5;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="logo-badge">
-      <span>P</span>
+    <div class="header-row">
+      <div class="logo-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"></circle>
+          <polyline points="12 7 12 12 15 14"></polyline>
+        </svg>
+      </div>
+      <div class="brand-block">
+        <span class="brand-name">Pingo</span>
+        <span class="status-dot"></span>
+        <span class="status-label">v1.0.0 · Android</span>
+      </div>
     </div>
-    <h1>Pingo for Android</h1>
-    <p class="subtitle">Smart Memory Assistant for Reminders, Voice Notes, and Documents</p>
-    
-    <div class="meta-box">
-      <span>Version: <strong>1.0.0 (Release)</strong></span>
-      <span>Size: <strong>55 MB</strong></span>
+
+    <h1>Personal alarm and document ledger</h1>
+    <p class="subtitle">Bilingual voice and text reminders with mandatory confirmation before any alarm is scheduled.</p>
+
+    <div class="ticket">
+      <div class="ticket-row">
+        <span class="ticket-label">Build</span>
+        <span class="ticket-value">1.0.0 · Release</span>
+      </div>
+      <div class="ticket-row">
+        <span class="ticket-label">Package size</span>
+        <span class="ticket-value">59.5 MB</span>
+      </div>
+      <div class="ticket-row">
+        <span class="ticket-label">Languages</span>
+        <span class="ticket-value">Bangla · English</span>
+      </div>
     </div>
 
     <a href="/download/app-release.apk" class="download-btn" download="pingo-release.apk">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
         <polyline points="7 10 12 15 17 10"></polyline>
         <line x1="12" y1="15" x2="12" y2="3"></line>
       </svg>
-      Download APK
+      Download Android APK
     </a>
 
     <div class="instructions">
-      After downloading, tap the file in your notification bar or Downloads folder to install.
+      Open the downloaded file from your device notifications or Downloads folder to install.
     </div>
   </div>
 </body>
