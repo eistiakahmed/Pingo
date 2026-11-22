@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:pingo_mobile/core/network/api_config.dart';
@@ -65,20 +67,24 @@ class FcmService {
       await Firebase.initializeApp();
       debugPrint('[FcmService] Firebase app initialized.');
 
-      // 1. Request notification permissions with critical alert support
+      // 1. Request notification permissions through the serialized NotificationService
+      //    on Android so FirebaseMessaging never collides with local permission dialogs.
       final messaging = FirebaseMessaging.instance;
-      final settings = await messaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: true,
-        provisional: false,
-        sound: true,
-      );
-
-      debugPrint(
-          '[FcmService] Authorization status: ${settings.authorizationStatus}');
+      if (!kIsWeb && Platform.isAndroid) {
+        await NotificationService.instance.ensureReminderPermissions();
+      } else {
+        final settings = await messaging.requestPermission(
+          alert: true,
+          announcement: false,
+          badge: true,
+          carPlay: false,
+          criticalAlert: true,
+          provisional: false,
+          sound: true,
+        );
+        debugPrint(
+            '[FcmService] Authorization status: ${settings.authorizationStatus}');
+      }
 
       // 2. Set foreground presentation options (alert, badge, sound)
       await messaging.setForegroundNotificationPresentationOptions(
@@ -94,7 +100,10 @@ class FcmService {
       _fcmToken = await messaging.getToken();
       debugPrint('[FcmService] Retrieved FCM Device Token: $_fcmToken');
 
-      if (_fcmToken != null) {
+      // Only register during early startup if an auth token already exists locally;
+      // otherwise HomeReminderNotifier calls registerActiveToken() right after auth completes.
+      final existingAuth = await LocalStorageService.instance.getAuthToken();
+      if (_fcmToken != null && existingAuth != null && existingAuth.isNotEmpty) {
         await _registerTokenWithBackend(_fcmToken!);
       }
 

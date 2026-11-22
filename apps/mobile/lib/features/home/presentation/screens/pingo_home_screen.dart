@@ -49,8 +49,9 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
       duration: const Duration(milliseconds: 900),
     );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      NotificationService.instance.initialize();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await NotificationService.instance.initialize();
+      await NotificationService.instance.ensureReminderPermissions();
     });
   }
 

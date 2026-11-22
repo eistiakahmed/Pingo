@@ -103,7 +103,7 @@ class FcmPushService:
                 android=messaging.AndroidConfig(
                     priority="high",
                     notification=messaging.AndroidNotification(
-                        channel_id="pingo_urgent_channel_v2",
+                        channel_id="pingo_urgent_channel_v3",
                         default_sound=True,
                         default_vibrate_timings=True,
                         click_action="FLUTTER_NOTIFICATION_CLICK",
@@ -115,11 +115,25 @@ class FcmPushService:
             logger.info(f"[FcmPushService] Push sent successfully: {response} -> Token: {token[:12]}...")
             return True
         except messaging.UnregisteredError:
-            logger.warning(f"[FcmPushService] Token is unregistered / expired: {token[:12]}...")
+            logger.warning(f"[FcmPushService] Token is unregistered / expired: {token[:12]}... Removing stale token.")
+            await self._remove_stale_token(token)
             return False
         except Exception as e:
             logger.error(f"[FcmPushService] Failed sending push notification: {e}")
             return False
+
+    async def _remove_stale_token(self, token: str) -> None:
+        """Deletes an unregistered or expired FCM token from PostgreSQL so it never clogs future ticks."""
+        try:
+            from sqlalchemy import delete
+            from app.db.session import AsyncSessionLocal
+            from app.models.device_token import DeviceToken
+
+            async with AsyncSessionLocal() as db:
+                await db.execute(delete(DeviceToken).where(DeviceToken.token == token))
+                await db.commit()
+        except Exception as e:
+            logger.warning(f"[FcmPushService] Could not remove stale token {token[:12]}...: {e}")
 
 
 fcm_push_service = FcmPushService()

@@ -65,10 +65,11 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
   /// Initializes local storage loading and silent background sync with PostgreSQL.
   Future<void> _initializePersistence() async {
     try {
-      // 1. Load from local device cache instantly
+      // 1. Load from local device cache instantly and ensure future alarms are scheduled
       final cached = await LocalStorageService.instance.loadReminders();
       if (cached.isNotEmpty) {
         state = state.copyWith(reminders: cached);
+        _scheduleActiveFutureAlarms(cached);
       }
 
       final ref = _ref;
@@ -100,13 +101,31 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
 
       apiClient.setAuthToken(token);
 
+      // Register device FCM push token AFTER auth token is saved so it binds to the right user_id
+      await FcmService.instance.registerActiveToken();
+
       // Pull updates from AWS PostgreSQL
       await pullFromServer(syncApi);
-
-      // Register device FCM push token with backend
-      FcmService.instance.registerActiveToken();
     } catch (e) {
       debugPrint('[HomeReminderNotifier] Cloud sync init warning: $e');
+    }
+  }
+
+  void _scheduleActiveFutureAlarms(List<ReminderItem> items) {
+    final now = DateTime.now();
+    for (final item in items) {
+      if (!item.isDone && item.dueAt.isAfter(now)) {
+        final timeStr = DateFormat.jm().format(item.dueAt);
+        final dateStr = DateFormat.MMMd().format(item.dueAt);
+        NotificationService.instance.scheduleReminder(
+          id: item.id.hashCode,
+          title: item.title,
+          body: '$timeStr · $dateStr',
+          scheduledDate: item.dueAt,
+          isUrgent: item.category == ReminderCategory.medicine ||
+              item.priority == ReminderPriority.important,
+        );
+      }
     }
   }
 
@@ -328,8 +347,9 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
         isSyncing: false,
       );
 
-      // Save merged list locally
+      // Save merged list locally and ensure local alarms are registered for upcoming items
       LocalStorageService.instance.saveReminders(merged);
+      _scheduleActiveFutureAlarms(merged);
       return true;
     } catch (e) {
       state = state.copyWith(isSyncing: false, syncError: e.toString());

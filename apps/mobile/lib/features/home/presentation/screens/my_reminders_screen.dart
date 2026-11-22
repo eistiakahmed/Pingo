@@ -60,15 +60,33 @@ class MyRemindersScreen extends ConsumerWidget {
             tooltip: isBangla ? 'টেস্ট এলার্ট' : 'Test alert',
             icon: const Icon(Icons.notifications_none_rounded, size: 18),
             color: AppColors.paperMuted,
-            onPressed: () {
+            onPressed: () async {
               HapticFeedback.lightImpact();
-              NotificationService.instance.showInstantTestNotification(
+              final shown = await NotificationService.instance
+                  .showInstantTestNotification(
                 title: isBangla ? 'পিঙ্গো টেস্ট এলার্ট' : 'Pingo test alert',
                 body: isBangla
                     ? 'এলার্ম এবং নোটিফিকেশন সক্রিয় রয়েছে'
                     : 'Alarms and notifications are operational',
               );
               FcmService.instance.triggerBackendTestPush();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      shown
+                          ? (isBangla
+                              ? 'টেস্ট নোটিফিকেশন পাঠানো হয়েছে'
+                              : 'Test notification sent')
+                          : (isBangla
+                              ? 'সিস্টেম সেটিংস থেকে নোটিফিকেশন চালু করুন'
+                              : 'Enable notifications in system settings'),
+                    ),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
           ),
         ],

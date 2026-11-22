@@ -17,21 +17,26 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _isInitialized = false;
+  Future<void>? _initFuture;
+  Future<bool>? _permissionFuture;
 
-  static const String _defaultChannelId = 'pingo_reminders_channel_v2';
+  static const String _defaultChannelId = 'pingo_reminders_channel_v3';
   static const String _defaultChannelName = 'Pingo Reminders';
   static const String _defaultChannelDesc =
       'Punctual alarms and task notifications from Pingo';
 
-  static const String _urgentChannelId = 'pingo_urgent_channel_v2';
+  static const String _urgentChannelId = 'pingo_urgent_channel_v3';
   static const String _urgentChannelName = 'Urgent Reminders';
   static const String _urgentChannelDesc =
       'High-priority alarms for medicine and critical deadlines';
 
   /// Initializes the local notification plugin, creates channels, and detects device timezone.
-  Future<void> initialize() async {
-    if (_isInitialized) return;
+  Future<void> initialize() {
+    if (_isInitialized) return Future.value();
+    return _initFuture ??= _initializeInternal();
+  }
 
+  Future<void> _initializeInternal() async {
     try {
       // 1. Initialize timezone database and detect device's actual native timezone
       tz.initializeTimeZones();
@@ -61,11 +66,11 @@ class NotificationService {
       );
 
       // 4. Linux settings
-      final linuxSettings = LinuxInitializationSettings(
+      const linuxSettings = LinuxInitializationSettings(
         defaultActionName: 'Open Pingo',
       );
 
-      final initSettings = InitializationSettings(
+      const initSettings = InitializationSettings(
         android: androidSettings,
         iOS: darwinSettings,
         macOS: darwinSettings,
@@ -95,6 +100,7 @@ class NotificationService {
             playSound: true,
             enableVibration: true,
             enableLights: true,
+            audioAttributesUsage: AudioAttributesUsage.alarm,
           );
 
           const urgentChannel = AndroidNotificationChannel(
@@ -105,6 +111,7 @@ class NotificationService {
             playSound: true,
             enableVibration: true,
             enableLights: true,
+            audioAttributesUsage: AudioAttributesUsage.alarm,
           );
 
           await androidImplementation.createNotificationChannel(defaultChannel);
@@ -115,59 +122,67 @@ class NotificationService {
       _isInitialized = true;
       debugPrint('[NotificationService] Initialized successfully.');
     } catch (e, stack) {
+      _initFuture = null;
       debugPrint('[NotificationService] Initialization failed: $e\n$stack');
     }
   }
 
   /// Requests Android runtime notification and exact alarm permissions.
-  Future<void> requestPermissions() async {
-    if (!kIsWeb && Platform.isAndroid) {
-      final androidImplementation = _notificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      if (androidImplementation != null) {
-        final notifGranted =
-            await androidImplementation.requestNotificationsPermission();
-        final exactGranted =
-            await androidImplementation.requestExactAlarmsPermission();
-        debugPrint(
-            '[NotificationService] Permissions -> Notifications: $notifGranted, Exact Alarms: $exactGranted');
-      }
-    }
+  Future<bool> requestPermissions() async {
+    return ensureReminderPermissions();
   }
 
-  /// Ensures reminder access right before scheduling one.
-  ///
-  /// Called contextually from [scheduleReminder]: Android only shows the
-  /// runtime dialog while the user is doing the thing that needs it. If the
-  /// user has already denied notifications, opens the app's system settings
-  /// page so access can be granted manually without hunting for it.
-  ///
-  /// Returns true when notifications are granted.
-  Future<bool> ensureReminderPermissions() async {
-    if (kIsWeb || !Platform.isAndroid) return true;
+  /// Ensures notification & exact-alarm access without unnecessarily launching Settings
+  /// when `USE_EXACT_ALARM` is already granted by the manifest.
+  /// Serialized via [_permissionFuture] so concurrent callers never trigger Android's
+  /// "Can request only one set of permissions at a time" cancellation bug.
+  Future<bool> ensureReminderPermissions({bool openSettingsOnDeny = false}) {
+    if (kIsWeb || !Platform.isAndroid) return Future.value(true);
+    return _permissionFuture ??=
+        _ensureReminderPermissionsInternal(openSettingsOnDeny: openSettingsOnDeny)
+            .whenComplete(() => _permissionFuture = null);
+  }
 
-    final status = await ph.Permission.notification.status;
-    if (status.isGranted || status.isLimited) {
-      // Already granted — only make sure exact alarms are permitted.
-      await ph.Permission.scheduleExactAlarm.request();
-      return true;
+  Future<bool> _ensureReminderPermissionsInternal({
+    required bool openSettingsOnDeny,
+  }) async {
+    if (!_isInitialized) await initialize();
+
+    final androidPlugin = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    // 1. Check / request POST_NOTIFICATIONS via one unified channel
+    bool notifEnabled = await androidPlugin?.areNotificationsEnabled() ?? false;
+    if (!notifEnabled) {
+      if (androidPlugin != null) {
+        notifEnabled =
+            await androidPlugin.requestNotificationsPermission() ?? false;
+      }
+      if (!notifEnabled) {
+        final status = await ph.Permission.notification.request();
+        notifEnabled = status.isGranted || status.isLimited;
+      }
+      if (!notifEnabled && openSettingsOnDeny) {
+        await ph.openAppSettings();
+        return false;
+      }
     }
 
-    final granted = await ph.Permission.notification.request();
-    if (!granted.isGranted && !granted.isLimited) {
-      // Dialog denied or permanently dismissed — take the user straight
-      // to the app settings page.
-      await ph.openAppSettings();
-      return false;
+    // 2. Check exact alarm capability via AlarmManager before requesting
+    if (androidPlugin != null) {
+      final canExact =
+          await androidPlugin.canScheduleExactNotifications() ?? true;
+      if (!canExact) {
+        await androidPlugin.requestExactAlarmsPermission();
+      }
     }
 
-    await ph.Permission.scheduleExactAlarm.request();
-    return true;
+    return notifEnabled;
   }
 
   /// Schedules a punctual notification at the specified [scheduledDate].
-  /// Alarms are always scheduled for the future in Android AlarmManager and NEVER trigger immediately at creation time.
+  /// Never fires prematurely for future dates and skips dates that are already in the past.
   Future<void> scheduleReminder({
     required int id,
     required String title,
@@ -179,15 +194,14 @@ class NotificationService {
       await initialize();
     }
 
-    // Contextual access check: the runtime dialog can only surface while
-    // the user is actively setting the reminder. Never schedule into a void.
     await ensureReminderPermissions();
 
     // Ensure 32-bit positive integer for Android PendingIntent
     final safeId = id.abs() % 2147483647;
 
-    final String timeStr = DateFormat.jm().format(scheduledDate);
-    final String dateStr = DateFormat.MMMd().format(scheduledDate);
+    final DateTime localDate = scheduledDate.toLocal();
+    final String timeStr = DateFormat.jm().format(localDate);
+    final String dateStr = DateFormat.MMMd().format(localDate);
 
     final displayBody = (body.isNotEmpty && body != 'Scheduled alert from Pingo')
         ? body
@@ -210,8 +224,10 @@ class NotificationService {
       priority: Priority.max,
       playSound: true,
       enableVibration: true,
+      fullScreenIntent: true,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.reminder,
+      category: AndroidNotificationCategory.alarm,
       ticker: title,
       styleInformation: styleInfo,
     );
@@ -231,32 +247,21 @@ class NotificationService {
 
     try {
       final tz.TZDateTime tzNow = tz.TZDateTime.now(tz.local);
-      tz.TZDateTime targetTz = tz.TZDateTime.from(scheduledDate, tz.local);
+      tz.TZDateTime targetTz = tz.TZDateTime.from(localDate, tz.local);
 
-      // If scheduled time is within 10 seconds of now or in the past (e.g. current minute ticking away),
-      // push it forward to at least 15 seconds from now so it is guaranteed to be in the future
-      // and satisfies Android AlarmManager requirements.
-      if (targetTz.isBefore(tzNow.add(const Duration(seconds: 10)))) {
-        targetTz = tzNow.add(const Duration(seconds: 15));
+      // If the reminder is more than 30 seconds in the past, do NOT schedule a false immediate alarm.
+      if (targetTz.isBefore(tzNow.subtract(const Duration(seconds: 30)))) {
         debugPrint(
-            '[NotificationService] Target date was too close to current time. Pushed forward to: $targetTz');
+            '[NotificationService] Skipping alarm #$safeId because scheduledDate ($targetTz) is in the past.');
+        return;
       }
 
-      // Check whether exact alarms are permitted on this device
-      bool canExact = true;
-      if (!kIsWeb && Platform.isAndroid) {
-        final androidPlugin = _notificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
-        canExact = await androidPlugin?.canScheduleExactNotifications() ?? true;
-        if (!canExact) {
-          debugPrint(
-              '[NotificationService] Exact alarms not permitted by OS. Prompting user...');
-          await androidPlugin?.requestExactAlarmsPermission();
-        }
+      // If scheduled within the next 5 seconds (e.g. current minute boundary), nudge 5s ahead.
+      if (targetTz.isBefore(tzNow.add(const Duration(seconds: 5)))) {
+        targetTz = tzNow.add(const Duration(seconds: 5));
       }
 
-      // Priority 1: Schedule as a native system AlarmClock (highest Android OS priority, exempt from Doze & Xiaomi killers)
+      // Priority 1: Native system AlarmClock (exempt from Android Doze)
       try {
         await _notificationsPlugin.zonedSchedule(
           safeId,
@@ -270,52 +275,51 @@ class NotificationService {
           payload: 'reminder_$safeId',
         );
         debugPrint(
-            '[NotificationService] Successfully scheduled reminder #$safeId as native AlarmClock for $targetTz');
+            '[NotificationService] Scheduled reminder #$safeId as native AlarmClock for $targetTz');
         return;
       } catch (alarmClockErr) {
         debugPrint(
-            '[NotificationService] AlarmClock schedule error ($alarmClockErr). Falling back to exactAllowWhileIdle...');
+            '[NotificationService] AlarmClock mode failed ($alarmClockErr). Trying exactAllowWhileIdle...');
       }
 
-      // Priority 2: Schedule with exactAllowWhileIdle or inexactAllowWhileIdle
-      final scheduleMode = canExact
-          ? AndroidScheduleMode.exactAllowWhileIdle
-          : AndroidScheduleMode.inexactAllowWhileIdle;
+      // Priority 2: exactAllowWhileIdle at the exact targetTz
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          safeId,
+          title,
+          displayBody,
+          targetTz,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: 'reminder_$safeId',
+        );
+        debugPrint(
+            '[NotificationService] Scheduled reminder #$safeId with exactAllowWhileIdle for $targetTz');
+        return;
+      } catch (exactErr) {
+        debugPrint(
+            '[NotificationService] exactAllowWhileIdle failed ($exactErr). Falling back to inexactAllowWhileIdle at targetTz...');
+      }
 
+      // Priority 3: inexactAllowWhileIdle at targetTz (NEVER 15s from now!)
       await _notificationsPlugin.zonedSchedule(
         safeId,
         title,
         displayBody,
         targetTz,
         notificationDetails,
-        androidScheduleMode: scheduleMode,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         payload: 'reminder_$safeId',
       );
-
       debugPrint(
-          '[NotificationService] Successfully scheduled reminder #$safeId for $targetTz with mode $scheduleMode');
+          '[NotificationService] Scheduled reminder #$safeId with inexactAllowWhileIdle for $targetTz');
     } catch (e) {
-      debugPrint('[NotificationService] Primary schedule failed: $e. Retrying with safe fallback...');
-      try {
-        final tz.TZDateTime tzNow = tz.TZDateTime.now(tz.local);
-        final fallbackTz = tzNow.add(const Duration(seconds: 15));
-        await _notificationsPlugin.zonedSchedule(
-          safeId,
-          title,
-          displayBody,
-          fallbackTz,
-          notificationDetails,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          payload: 'reminder_$safeId',
-        );
-        debugPrint('[NotificationService] Fallback scheduled for $fallbackTz');
-      } catch (fallbackError) {
-        debugPrint('[NotificationService] Fatal: could not register alarm with AlarmManager: $fallbackError');
-      }
+      debugPrint(
+          '[NotificationService] Fatal: could not register alarm #$safeId: $e');
     }
   }
 
@@ -350,10 +354,14 @@ class NotificationService {
 
   /// Shows an instant test notification styled with dynamic user title and body.
   Future<bool> showInstantTestNotification({
-    String title = 'Pingo Test Alert',
-    String body = 'Alarms and notification engine are fully operational.',
+    String title = 'Pingo test alert',
+    String body = 'Alarms and notifications are operational',
   }) async {
     if (!_isInitialized) await initialize();
+    final permitted =
+        await ensureReminderPermissions(openSettingsOnDeny: true);
+    if (!permitted) return false;
+
     final styleInfo = BigTextStyleInformation(
       body,
       htmlFormatBigText: false,
@@ -369,8 +377,10 @@ class NotificationService {
       priority: Priority.max,
       playSound: true,
       enableVibration: true,
+      fullScreenIntent: true,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.reminder,
+      category: AndroidNotificationCategory.alarm,
       ticker: title,
       styleInformation: styleInfo,
     );
@@ -387,6 +397,7 @@ class NotificationService {
     String? payload,
   }) async {
     if (!_isInitialized) await initialize();
+    await ensureReminderPermissions();
     final safeId = id.abs() % 2147483647;
 
     final styleInfo = BigTextStyleInformation(
@@ -405,8 +416,10 @@ class NotificationService {
       priority: Priority.max,
       playSound: true,
       enableVibration: true,
+      fullScreenIntent: true,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
       visibility: NotificationVisibility.public,
-      category: AndroidNotificationCategory.reminder,
+      category: AndroidNotificationCategory.alarm,
       ticker: title,
       styleInformation: styleInfo,
     );
@@ -431,9 +444,11 @@ class NotificationService {
         notificationDetails,
         payload: payload,
       );
-      debugPrint('[NotificationService] Displayed push notification #$safeId: "$title"');
+      debugPrint(
+          '[NotificationService] Displayed push notification #$safeId: "$title"');
     } catch (e) {
-      debugPrint('[NotificationService] Error displaying push notification: $e');
+      debugPrint(
+          '[NotificationService] Error displaying push notification: $e');
     }
   }
 

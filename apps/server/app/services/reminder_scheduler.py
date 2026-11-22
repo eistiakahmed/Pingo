@@ -97,14 +97,24 @@ class ReminderScheduler:
                     tokens = token_res.scalars().all()
 
                     if tokens:
+                        from zoneinfo import ZoneInfo
+                        due_body = "Scheduled alarm from Pingo"
+                        if reminder.due_at:
+                            try:
+                                dhaka_dt = reminder.due_at.astimezone(ZoneInfo("Asia/Dhaka"))
+                                due_body = dhaka_dt.strftime("%I:%M %p · %d %b").lstrip("0")
+                            except Exception:
+                                due_body = reminder.due_at.strftime("%H:%M UTC · %d %b")
+
                         for token in tokens:
                             await fcm_push_service.send_reminder_push(
                                 token=token,
                                 title=reminder_title,
-                                body="You have a scheduled reminder right now.",
+                                body=due_body,
                                 data={
                                     "reminder_id": str(reminder.id),
                                     "title": reminder_title,
+                                    "body": due_body,
                                     "due_at": reminder.due_at.isoformat() if reminder.due_at else "",
                                     "ciphertext": reminder.ciphertext,
                                     "iv": reminder.iv,

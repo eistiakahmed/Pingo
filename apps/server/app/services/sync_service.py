@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.reminder import EncryptedReminder
@@ -38,30 +38,34 @@ class SyncService:
 
         # 1. Atomic Bulk Upsert Reminders with Last-Write-Wins
         if request.reminders:
-            reminder_values = [
-                {
-                    "id": r.id,
-                    "user_id": request.user_id,
-                    "ciphertext": r.ciphertext,
-                    "iv": r.iv,
-                    "auth_tag": r.auth_tag,
-                    "key_version": r.key_version,
-                    "algorithm": r.algorithm,
-                    "due_at": normalize_due_at(r.due_at),
-                    "is_completed": r.is_completed,
-                    "version": r.version,
-                    "created_at": r.created_at or now,
-                    "updated_at": now,
-                    "deleted_at": r.deleted_at,
-                    "notification_sent": False,
-                }
-                for r in request.reminders
-            ]
+            reminder_values = []
+            for r in request.reminders:
+                norm_due = normalize_due_at(r.due_at)
+                already_past = bool(norm_due and norm_due < now)
+                reminder_values.append(
+                    {
+                        "id": r.id,
+                        "user_id": request.user_id,
+                        "ciphertext": r.ciphertext,
+                        "iv": r.iv,
+                        "auth_tag": r.auth_tag,
+                        "key_version": r.key_version,
+                        "algorithm": r.algorithm,
+                        "due_at": norm_due,
+                        "is_completed": r.is_completed,
+                        "version": r.version,
+                        "created_at": r.created_at or now,
+                        "updated_at": now,
+                        "deleted_at": r.deleted_at,
+                        "notification_sent": already_past or r.is_completed,
+                    }
+                )
 
             stmt = pg_insert(EncryptedReminder).values(reminder_values)
             stmt = stmt.on_conflict_do_update(
                 index_elements=[EncryptedReminder.id],
                 set_={
+                    "user_id": stmt.excluded.user_id,
                     "ciphertext": stmt.excluded.ciphertext,
                     "iv": stmt.excluded.iv,
                     "auth_tag": stmt.excluded.auth_tag,
@@ -69,15 +73,21 @@ class SyncService:
                     "algorithm": stmt.excluded.algorithm,
                     "due_at": stmt.excluded.due_at,
                     "is_completed": stmt.excluded.is_completed,
-                    "notification_sent": stmt.excluded.notification_sent,
+                    # Only re-arm notification_sent to False when due_at moves forward into the future
+                    "notification_sent": case(
+                        (
+                            (stmt.excluded.due_at > EncryptedReminder.due_at)
+                            & (stmt.excluded.due_at > now)
+                            & (stmt.excluded.is_completed.is_(False)),
+                            False,
+                        ),
+                        else_=EncryptedReminder.notification_sent,
+                    ),
                     "version": stmt.excluded.version,
                     "updated_at": now,
                     "deleted_at": stmt.excluded.deleted_at,
                 },
-                where=(
-                    (EncryptedReminder.user_id == request.user_id)
-                    & (stmt.excluded.version >= EncryptedReminder.version)
-                ),
+                where=(stmt.excluded.version >= EncryptedReminder.version),
             )
             await db.execute(stmt)
             applied_count += len(request.reminders)

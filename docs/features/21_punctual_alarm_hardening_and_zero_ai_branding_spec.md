@@ -1,9 +1,24 @@
 # Feature Specification: Punctual Alarm Hardening & Zero-AI UI Branding
 
 **Specification ID**: `SPEC-21-PUNCTUAL-ALARM-ZERO-AI`  
-**Status**: APPROVED & IMPLEMENTED  
-**Date**: November 15, 2026  
-**Scope**: Mobile Core Services (`NotificationService`, `PingoFlowScreen`), Native Android Permissions, UX Hardening  
+**Version**: `2.1.0` (APPROVED & HARDENED)  
+**Date**: November 23, 2026  
+**Scope**: Mobile Core Services (`NotificationService`, `FcmService`, `HomeReminderNotifier`), Backend (`SyncService`, `FcmPushService`, `ReminderScheduler`)  
+
+---
+
+## 0. v2.1 Notification Pipeline Hardening Fixes
+
+1. **Eliminated 15-Second Premature Fallback Alarm (`notification_service.dart`)**:
+   - All three priority tiers (`alarmClock` → `exactAllowWhileIdle` → `inexactAllowWhileIdle`) now strictly schedule at `targetTz` rather than falling back to `tzNow.add(const Duration(seconds: 15))`, and reminders more than 30 seconds in the past are skipped.
+2. **Serialized Android Permission Mutex (`notification_service.dart` & `fcm_service.dart`)**:
+   - Permission requests are serialized through `_permissionFuture` in `NotificationService.ensureReminderPermissions()`, preventing Android's `"Can request only one set of permissions at a time"` cancellation when `FcmService` and `NotificationService` initialize concurrently.
+3. **Preserved `notification_sent` Across Cloud Syncs (`sync_service.py`)**:
+   - `SyncService.apply_push` only resets `notification_sent = False` when `due_at` moves forward into the future, preventing repeat push notification storms for already-fired reminders.
+4. **Automatic Pruning of Unregistered FCM Tokens (`fcm_service.py`)**:
+   - `_remove_stale_token` deletes dead tokens from PostgreSQL `device_tokens` immediately upon `messaging.UnregisteredError`.
+5. **Authenticated FCM Token Binding & Startup Re-Arming (`home_reminder_provider.dart`)**:
+   - Device FCM token registration runs after device auth token registration completes so the token binds to the right `user_id`, and active future reminders are re-armed in local `AlarmManager` on startup and sync pull.
 
 ---
 
