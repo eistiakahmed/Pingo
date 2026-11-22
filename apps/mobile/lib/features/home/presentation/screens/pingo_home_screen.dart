@@ -347,7 +347,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
       ),
       child: Row(
         children: [
-          // Flat horological glyph mark in a quiet 32x32 bordered keycap
+          // Pingo headphone-penguin avatar inside a 32x32 bordered frame
           Container(
             width: 32,
             height: 32,
@@ -356,10 +356,11 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.inkBorder, width: 1),
             ),
-            child: const Icon(
-              Icons.schedule_rounded,
-              color: AppColors.paperWhite,
-              size: 18,
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              'assets/images/penguin_avatar.png',
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.medium,
             ),
           ),
           const SizedBox(width: 12),

@@ -13,7 +13,7 @@
 - **Character**: Quiet, exact, tactile.
 - **World**: Late-night desk ledger and precision pocket timepiece — matte ink surfaces (`#07080D` to `#1A1E28`), crisp paper-white typography (`#EEF0F5`), hairline borders (`#222734`), and one signal-amber accent (`#E5A93C`).
 - **Moments**: The inline **Horological Alarm Ticket** (confirmation slip inside chat bubbles with tabular time figures and tactile schedule/discard controls) and the **Encrypted Document Slip**.
-- **Signature**: A 6px semantic status dot (amber `#E5A93C` while pending confirmation, sage `#4CC38A` once scheduled, crimson `#E5484D` when overdue) paired with a tabular timestamp (`HH:MM · DD MMM`).
+- **Signature**: A 6px semantic status dot (amber `#E5A93C` while pending confirmation, sage `#4CC38A` once scheduled, crimson `#E5484D` when overdue) paired with a tabular timestamp (`HH:MM · DD MMM`), alongside the headphone-penguin brand icon across Android adaptive mipmaps (`ic_launcher`, `ic_launcher_round`, `ic_launcher_foreground`), the top bar (`32×32px`), and the download portal.
 
 ## 1. Executive Summary & Core Architectural Invariants
 

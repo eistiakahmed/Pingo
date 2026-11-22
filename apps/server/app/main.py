@@ -68,11 +68,19 @@ async def root():
 # APK Web Distribution
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_HTML_PATH = os.path.join(BASE_DIR, "static", "download.html")
+PINGO_ICON_PATH = os.path.join(BASE_DIR, "static", "pingo_icon.png")
 APK_CANDIDATE_PATHS = [
     "/app/downloads/app-release.apk",
     os.path.join(BASE_DIR, "static", "app-release.apk"),
     os.path.join(os.path.dirname(BASE_DIR), "downloads", "app-release.apk"),
 ]
+
+
+@app.get("/download/pingo_icon.png", tags=["Distribution"])
+async def download_pingo_icon():
+    if os.path.exists(PINGO_ICON_PATH):
+        return FileResponse(path=PINGO_ICON_PATH, media_type="image/png")
+    raise HTTPException(status_code=404, detail="Icon not found")
 
 
 @app.get("/download", response_class=HTMLResponse, tags=["Distribution"])
