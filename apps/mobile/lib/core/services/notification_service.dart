@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -19,6 +20,7 @@ class NotificationService {
   bool _isInitialized = false;
   Future<void>? _initFuture;
   Future<bool>? _permissionFuture;
+  final Map<int, Timer> _activeTimers = {};
 
   static const String _defaultChannelId = 'pingo_reminders_channel_v3';
   static const String _defaultChannelName = 'Pingo Reminders';
@@ -261,7 +263,31 @@ class NotificationService {
         targetTz = tzNow.add(const Duration(seconds: 5));
       }
 
-      // Priority 1: Native system AlarmClock (exempt from Android Doze)
+      // Layer 1: In-process exact Dart Timer fallback.
+      // Guarantees punctual delivery with sound while the app process is alive
+      // in foreground or background memory, even on aggressive OEM battery savers.
+      _activeTimers[safeId]?.cancel();
+      final Duration delay = targetTz.difference(tzNow);
+      _activeTimers[safeId] = Timer(delay, () async {
+        _activeTimers.remove(safeId);
+        try {
+          await _notificationsPlugin.cancel(safeId);
+          await _notificationsPlugin.show(
+            safeId,
+            title,
+            displayBody,
+            notificationDetails,
+            payload: 'reminder_$safeId',
+          );
+          debugPrint(
+              '[NotificationService] Fired in-app timer notification #$safeId: "$title"');
+        } catch (timerErr) {
+          debugPrint(
+              '[NotificationService] In-app timer show error: $timerErr');
+        }
+      });
+
+      // Layer 2: Native system AlarmClock (wakes device when app is closed/killed)
       try {
         await _notificationsPlugin.zonedSchedule(
           safeId,
@@ -456,6 +482,7 @@ class NotificationService {
   Future<void> cancelReminder(int id) async {
     try {
       final safeId = id.abs() % 2147483647;
+      _activeTimers.remove(safeId)?.cancel();
       await _notificationsPlugin.cancel(safeId);
       debugPrint('[NotificationService] Cancelled reminder #$safeId');
     } catch (e) {
@@ -466,6 +493,10 @@ class NotificationService {
   /// Cancels all scheduled notifications.
   Future<void> cancelAll() async {
     try {
+      for (final timer in _activeTimers.values) {
+        timer.cancel();
+      }
+      _activeTimers.clear();
       await _notificationsPlugin.cancelAll();
       debugPrint('[NotificationService] Cancelled all reminders.');
     } catch (e) {

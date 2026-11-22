@@ -19,7 +19,7 @@ password_hash = PasswordHash((Argon2Hasher(),))
 security_bearer = HTTPBearer(auto_error=False)
 
 ALGORITHM = "HS256"
-DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 365  # 365 days for persistent mobile device sessions
 
 
 def hash_password(password: str) -> str:
@@ -138,7 +138,17 @@ async def get_current_user_optional(
         return None
 
     try:
-        payload = decode_access_token(credentials.credentials)
+        try:
+            payload = decode_access_token(credentials.credentials)
+        except AppException:
+            # Verify HMAC signature even if the 7-day exp passed so device sync/push
+            # stays bound to the device's own user_id rather than falling back to None.
+            payload = jwt.decode(
+                credentials.credentials,
+                settings.SECRET_KEY,
+                algorithms=[ALGORITHM],
+                options={"verify_signature": True, "verify_exp": False},
+            )
         user_id_str = payload.get("sub")
         if not user_id_str:
             return None

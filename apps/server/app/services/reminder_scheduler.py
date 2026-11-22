@@ -89,13 +89,20 @@ class ReminderScheduler:
                         except Exception:
                             pass
 
-                    # 2. Fetch user's registered device tokens
+                    # 2. Fetch user's registered device tokens (fallback to all active device tokens if user row has none)
                     token_stmt = select(DeviceToken.token).where(
                         DeviceToken.user_id == reminder.user_id
                     )
                     token_res = await db.execute(token_stmt)
-                    tokens = token_res.scalars().all()
+                    tokens = list(token_res.scalars().all())
+                    if not tokens:
+                        fallback_stmt = select(DeviceToken.token).order_by(
+                            DeviceToken.updated_at.desc()
+                        )
+                        fallback_res = await db.execute(fallback_stmt)
+                        tokens = list(fallback_res.scalars().all())
 
+                    delivered_any = False
                     if tokens:
                         from zoneinfo import ZoneInfo
                         due_body = "Scheduled alarm from Pingo"
@@ -107,7 +114,7 @@ class ReminderScheduler:
                                 due_body = reminder.due_at.strftime("%H:%M UTC · %d %b")
 
                         for token in tokens:
-                            await fcm_push_service.send_reminder_push(
+                            ok = await fcm_push_service.send_reminder_push(
                                 token=token,
                                 title=reminder_title,
                                 body=due_body,
@@ -121,10 +128,14 @@ class ReminderScheduler:
                                     "auth_tag": reminder.auth_tag,
                                 },
                             )
+                            if ok:
+                                delivered_any = True
 
-                    # 3. Mark reminder as notified
-                    reminder.notification_sent = True
-                    notified_count += 1
+                    # 3. Mark reminder as notified once delivered (or if older than 10 minutes with no reachable devices)
+                    age_seconds = (now - reminder.due_at).total_seconds() if reminder.due_at else 9999
+                    if delivered_any or age_seconds > 600:
+                        reminder.notification_sent = True
+                        notified_count += 1
 
                 await db.commit()
                 logger.info(f"[ReminderScheduler] Dispatched notifications for {notified_count} reminder(s).")

@@ -1,13 +1,22 @@
 # Feature Specification: Punctual Alarm Hardening & Zero-AI UI Branding
 
 **Specification ID**: `SPEC-21-PUNCTUAL-ALARM-ZERO-AI`  
-**Version**: `2.1.0` (APPROVED & HARDENED)  
+**Version**: `2.2.0` (R8/PROGUARD RELEASE HARDENING + 3-LAYER DELIVERY)  
 **Date**: November 23, 2026  
-**Scope**: Mobile Core Services (`NotificationService`, `FcmService`, `HomeReminderNotifier`), Backend (`SyncService`, `FcmPushService`, `ReminderScheduler`)  
+**Scope**: Mobile Core Services (`NotificationService`, `FcmService`, `HomeReminderNotifier`), Android R8/ProGuard (`proguard-rules.pro`, `keep.xml`), Backend (`security.py`, `ReminderScheduler`)  
 
 ---
 
-## 0. v2.1 Notification Pipeline Hardening Fixes
+## 0. v2.2 Three-Layer Release Notification Hardening
+
+1. **Fixed R8/ProGuard `TypeToken<NotificationDetails>` Stripping in Release APKs (`proguard-rules.pro`, `build.gradle.kts`, `keep.xml`)**:
+   - In release builds, R8 previously inlined `ScheduledNotificationReceiver$1` (`new TypeToken<NotificationDetails>() {}`) and stripped generic `Signature` attributes, causing `ScheduledNotificationReceiver.onReceive()` to crash with `RuntimeException: Missing type parameter` whenever an `AlarmManager` broadcast fired.
+   - Added `proguard-rules.pro` keeping `Signature`, `com.dexterous.**`, `com.google.gson.**`, and `* extends com.google.gson.reflect.TypeToken`, plus `res/raw/keep.xml` to preserve `@mipmap/ic_launcher`.
+2. **In-Process Exact Dart Timer Layer (`notification_service.dart`)**:
+   - Added `_activeTimers[safeId]` in `NotificationService.scheduleReminder` so that while the app is open or in warm background memory, a Dart `Timer(delay, ...)` fires `_notificationsPlugin.show(...)` at the exact second and cancels the duplicate `AlarmManager` PendingIntent.
+3. **Expired 7-Day JWT Recovery & Fallback Token Delivery (`home_reminder_provider.dart`, `security.py`, `reminder_scheduler.py`)**:
+   - `HomeReminderNotifier` now verifies `authApi.getMe()` on startup and automatically re-authenticates when a cached token has expired.
+   - `get_current_user_optional` on the server verifies HMAC signatures even if a 7-day `exp` timestamp passed (and extends default device JWT expiry to 365 days), and `ReminderScheduler` falls back to active `DeviceToken` rows when a reminder's user row has no direct tokens.
 
 1. **Eliminated 15-Second Premature Fallback Alarm (`notification_service.dart`)**:
    - All three priority tiers (`alarmClock` → `exactAllowWhileIdle` → `inexactAllowWhileIdle`) now strictly schedule at `targetTz` rather than falling back to `tzNow.add(const Duration(seconds: 15))`, and reminders more than 30 seconds in the past are skipped.

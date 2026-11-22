@@ -81,7 +81,18 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
       final apiClient = ref.read(apiClientProvider);
 
       String? token = await LocalStorageService.instance.getAuthToken();
-      if (token == null || token.isEmpty) {
+      bool tokenValid = false;
+      if (token != null && token.isNotEmpty) {
+        apiClient.setAuthToken(token);
+        try {
+          await authApi.getMe();
+          tokenValid = true;
+        } catch (_) {
+          tokenValid = false;
+        }
+      }
+
+      if (!tokenValid) {
         final deviceId = await LocalStorageService.instance.getOrCreateDeviceId();
         final deviceEmail =
             'device_${deviceId.replaceAll("-", "").substring(0, 12)}@pingo.internal';
@@ -89,17 +100,16 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
 
         try {
           final session =
-              await authApi.register(email: deviceEmail, password: devicePass);
+              await authApi.login(email: deviceEmail, password: devicePass);
           token = session.accessToken;
         } catch (_) {
           final session =
-              await authApi.login(email: deviceEmail, password: devicePass);
+              await authApi.register(email: deviceEmail, password: devicePass);
           token = session.accessToken;
         }
         await LocalStorageService.instance.saveAuthToken(token);
+        apiClient.setAuthToken(token);
       }
-
-      apiClient.setAuthToken(token);
 
       // Register device FCM push token AFTER auth token is saved so it binds to the right user_id
       await FcmService.instance.registerActiveToken();
