@@ -43,6 +43,10 @@ class ApiConfig {
   static String get registerDeviceToken => '$baseUrl$prefixV1/devices/register-token';
   static String get testPush => '$baseUrl$prefixV1/devices/test-push';
   static String get voiceCommand => '$baseUrl/api/voice-command';
+  static String get attachmentsStage => '$baseUrl/api/attachments/stage';
+  static String get attachmentsStaged => '$baseUrl/api/attachments/staged';
+  static String get assistantMessage => '$baseUrl/api/assistant/message';
+  static String get assistantReminders => '$baseUrl/api/assistant/reminders';
 
   /// Resolves relative backend audio paths (e.g. '/static/audio/abc.mp3') to full URLs.
   static String resolveMediaUrl(String urlOrPath) {

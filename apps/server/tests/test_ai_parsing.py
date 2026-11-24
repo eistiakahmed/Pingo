@@ -102,14 +102,14 @@ CASES = [
 
 def test_prompt_contains_all_rules():
     for fragment in [
-        "Never correct",
+        "Autonomously classify",
         "Banglish",
         "current local date",
         "use tomorrow",
         "neutral title",
         "clarifying question",
         "create_reminder",
-        "alarm",
+        "deprecated",
     ]:
         assert fragment.lower() in PARSER_SYSTEM_PROMPT.lower(), fragment
 
@@ -124,13 +124,12 @@ def test_prompt_has_at_least_eight_examples():
 def test_schema_is_strict_and_complete():
     props = set(PARSING_JSON_SCHEMA["properties"])
     assert props == {
-        "intent", "title", "date", "time", "clarifying_question", "confidence",
+        "intent", "title", "date", "time", "category", "priority", "clarifying_question", "confidence",
     }
     assert set(PARSING_JSON_SCHEMA["required"]) == props
     assert PARSING_JSON_SCHEMA["additionalProperties"] is False
     assert set(PARSING_JSON_SCHEMA["properties"]["intent"]["enum"]) == {
-        "create_reminder", "list_reminders", "delete_reminder",
-        "update_reminder", "chat",
+        "create_reminder", "list_reminders", "save_documentation", "chat",
     }
 
 

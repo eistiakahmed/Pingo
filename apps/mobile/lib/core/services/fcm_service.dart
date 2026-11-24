@@ -100,10 +100,9 @@ class FcmService {
       _fcmToken = await messaging.getToken();
       debugPrint('[FcmService] Retrieved FCM Device Token: $_fcmToken');
 
-      // Only register during early startup if an auth token already exists locally;
-      // otherwise HomeReminderNotifier calls registerActiveToken() right after auth completes.
-      final existingAuth = await LocalStorageService.instance.getAuthToken();
-      if (_fcmToken != null && existingAuth != null && existingAuth.isNotEmpty) {
+      // Strictly disable `/devices` calls when unauthenticated
+      final isAuthed = await LocalStorageService.instance.isExplicitlyAuthenticated();
+      if (_fcmToken != null && isAuthed) {
         await _registerTokenWithBackend(_fcmToken!);
       }
 
@@ -201,16 +200,19 @@ class FcmService {
 
   Future<bool> _registerTokenWithBackend(String token) async {
     try {
+      // Directive 4: Strictly disable `/devices` calls when unauthenticated
       final authToken = await LocalStorageService.instance.getAuthToken();
+      if (authToken == null || authToken.isEmpty) {
+        debugPrint('[FcmService] Skipping /devices/register-token (unauthenticated guest session).');
+        return false;
+      }
       final url = Uri.parse(ApiConfig.registerDeviceToken);
 
       final headers = <String, String>{
         'Content-Type': 'application/json; charset=utf-8',
         'Accept': 'application/json',
+        'Authorization': 'Bearer $authToken',
       };
-      if (authToken != null && authToken.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $authToken';
-      }
 
       final response = await http
           .post(
@@ -247,15 +249,16 @@ class FcmService {
       final token = _fcmToken ?? await FirebaseMessaging.instance.getToken();
       if (token == null) return false;
       final authToken = await LocalStorageService.instance.getAuthToken();
+      if (authToken == null || authToken.isEmpty) {
+        return false;
+      }
       final url = Uri.parse(ApiConfig.testPush);
 
       final headers = <String, String>{
         'Content-Type': 'application/json; charset=utf-8',
         'Accept': 'application/json',
+        'Authorization': 'Bearer $authToken',
       };
-      if (authToken != null && authToken.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $authToken';
-      }
 
       final response = await http
           .post(

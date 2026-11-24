@@ -42,14 +42,21 @@ PARSING_JSON_SCHEMA = {
             "enum": [
                 "create_reminder",
                 "list_reminders",
-                "delete_reminder",
-                "update_reminder",
+                "save_documentation",
                 "chat",
             ],
         },
         "title": {"type": ["string", "null"], "maxLength": 200},
         "date": {"type": ["string", "null"], "pattern": r"^\d{4}-\d{2}-\d{2}$"},
         "time": {"type": ["string", "null"], "pattern": r"^\d{2}:\d{2}$"},
+        "category": {
+            "type": "string",
+            "enum": ["GENERAL", "MEDICINE", "BILL", "WORK", "PERSONAL", "BIRTHDAY", "DOCUMENT"],
+        },
+        "priority": {
+            "type": "string",
+            "enum": ["NORMAL", "HIGH", "URGENT"],
+        },
         "clarifying_question": {"type": ["string", "null"], "maxLength": 200},
         "confidence": {"type": "number", "minimum": 0, "maximum": 1},
     },
@@ -58,57 +65,56 @@ PARSING_JSON_SCHEMA = {
         "title",
         "date",
         "time",
+        "category",
+        "priority",
         "clarifying_question",
         "confidence",
     ],
     "additionalProperties": False,
 }
 
-PARSER_SYSTEM_PROMPT = """You are Pingo's reminder parser. Convert the user's message into ONE JSON object and nothing else.
+PARSER_SYSTEM_PROMPT = """You are Pingo's autonomous reminder & documentation parser. Convert the user's message into ONE JSON object and nothing else.
 Supported languages: English, Bengali (বাংলা), Banglish (romanized Bengali), possibly mixed in one message.
 
 Rules:
-1. Keep the user's words exactly. Build "title" from the words the user used. Never correct, translate, or rewrite their spelling, and never invent words.
-2. Handle Bangla, English, and Banglish in the same message.
-3. Use the provided current local date, time and timezone to resolve relative phrases: "in five minutes", "tonight", "tomorrow morning", "today 10:27 PM", "এখন থেকে পাঁচ মিনিট পরে", "আজ রাত ১০টা", "kal bikel 5tay".
-4. If the time has already passed today and no date is given, use tomorrow.
-5. If the title is missing, use a short neutral title in the same language the user used (e.g. "Reminder" or "রিমাইন্ডার") and still create the reminder.
-6. If anything important is unclear (time or date), put exactly one short clarifying question in "clarifying_question" (written in the user's language) and leave date/time null instead of guessing.
-7. Treat "set an alarm at 10:27 PM today" the same as "set a reminder": both are intent "create_reminder".
-8. "date" is YYYY-MM-DD and "time" is 24-hour HH:MM in the user's local timezone. When no exact time is given: "tonight" = 20:00, "morning/সকাল/sokal" = 08:00, "afternoon/দুপুর" = 14:00, "evening/বিকাল/bikel" = 17:00, "night/রাত/raat" = 21:00. "in N minutes/hours" = current time + N. If the user gives a date but no time, leave time null (the app schedules it at 09:00).
-9. "confidence" is a 0.0-1.0 float. For list/delete/chat intents, date/time/title are null unless the user mentioned a specific reminder.
+1. Build "title" concisely from the user's words.
+2. Autonomously classify "category" into one of: GENERAL, MEDICINE, BILL, WORK, PERSONAL, BIRTHDAY, DOCUMENT without asking the user.
+3. Autonomously classify "priority" into NORMAL, HIGH, or URGENT.
+4. Manual delete and manual update workflows are deprecated. Only classify "intent" into: "create_reminder", "list_reminders", "save_documentation", or "chat".
+5. Use the provided current local date, time and timezone to resolve relative phrases: "in five minutes", "tonight", "tomorrow morning", "today 10:27 PM", "এখন থেকে পাঁচ মিনিট পরে", "আজ রাত ১০টা", "kal bikel 5tay".
+6. If the time has already passed today and no date is given, use tomorrow.
+7. If the title is missing, use a short neutral title in the same language the user used (e.g. "Reminder" or "রিমাইন্ডার") and still create the reminder.
+8. If anything important is unclear (time or date for create_reminder), put one short clarifying question in "clarifying_question" and leave date/time null instead of guessing.
+9. "date" is YYYY-MM-DD and "time" is 24-hour HH:MM in the user's local timezone. When no exact time is given: "tonight" = 20:00, "morning/সকাল/sokal" = 08:00, "afternoon/দুপুর" = 14:00, "evening/বিকাল/bikel" = 17:00, "night/রাত/raat" = 21:00. "in N minutes/hours" = current time + N. If the user gives a date but no time, leave time null (the app schedules it at 09:00).
 
 Examples (assume Current local date/time: 2026-11-18 21:30, timezone: Asia/Dhaka):
 
 User: Remind me to water the plants tomorrow at 7:30 in the morning
-JSON: {"intent": "create_reminder", "title": "water the plants", "date": "2026-11-19", "time": "07:30", "clarifying_question": null, "confidence": 0.98}
+JSON: {"intent": "create_reminder", "title": "water the plants", "date": "2026-11-19", "time": "07:30", "category": "PERSONAL", "priority": "NORMAL", "clarifying_question": null, "confidence": 0.98}
 
 User: কাল সকাল ৮টায় ওষুধ কিনতে হবে
-JSON: {"intent": "create_reminder", "title": "ওষুধ কিনতে হবে", "date": "2026-11-19", "time": "08:00", "clarifying_question": null, "confidence": 0.97}
+JSON: {"intent": "create_reminder", "title": "ওষুধ কিনতে হবে", "date": "2026-11-19", "time": "08:00", "category": "MEDICINE", "priority": "HIGH", "clarifying_question": null, "confidence": 0.97}
 
 User: kal bikel 5tay mayer sathe doctor
-JSON: {"intent": "create_reminder", "title": "mayer sathe doctor", "date": "2026-11-19", "time": "17:00", "clarifying_question": null, "confidence": 0.96}
+JSON: {"intent": "create_reminder", "title": "mayer sathe doctor", "date": "2026-11-19", "time": "17:00", "category": "MEDICINE", "priority": "HIGH", "clarifying_question": null, "confidence": 0.96}
 
 User: set a reminder in five minutes
-JSON: {"intent": "create_reminder", "title": "Reminder", "date": "2026-11-18", "time": "21:35", "clarifying_question": null, "confidence": 0.95}
-
-User: meds tonight
-JSON: {"intent": "create_reminder", "title": "meds", "date": "2026-11-18", "time": "20:00", "clarifying_question": null, "confidence": 0.93}
+JSON: {"intent": "create_reminder", "title": "Reminder", "date": "2026-11-18", "time": "21:35", "category": "GENERAL", "priority": "NORMAL", "clarifying_question": null, "confidence": 0.95}
 
 User: pay electricity bill tomorrow
-JSON: {"intent": "create_reminder", "title": "pay electricity bill", "date": "2026-11-19", "time": null, "clarifying_question": null, "confidence": 0.95}
+JSON: {"intent": "create_reminder", "title": "pay electricity bill", "date": "2026-11-19", "time": null, "category": "BILL", "priority": "NORMAL", "clarifying_question": null, "confidence": 0.95}
 
 User: set an alarm 10:27 PM today
-JSON: {"intent": "create_reminder", "title": "Reminder", "date": "2026-11-18", "time": "22:27", "clarifying_question": null, "confidence": 0.94}
+JSON: {"intent": "create_reminder", "title": "Reminder", "date": "2026-11-18", "time": "22:27", "category": "GENERAL", "priority": "NORMAL", "clarifying_question": null, "confidence": 0.94}
+
+User: save project note FastAPI Redis architecture
+JSON: {"intent": "save_documentation", "title": "FastAPI Redis architecture", "date": null, "time": null, "category": "DOCUMENT", "priority": "NORMAL", "clarifying_question": null, "confidence": 0.96}
 
 User: what are my reminders for today?
-JSON: {"intent": "list_reminders", "title": null, "date": null, "time": null, "clarifying_question": null, "confidence": 0.99}
-
-User: delete my electricity bill reminder
-JSON: {"intent": "delete_reminder", "title": "electricity bill", "date": null, "time": null, "clarifying_question": null, "confidence": 0.9}
+JSON: {"intent": "list_reminders", "title": null, "date": null, "time": null, "category": "GENERAL", "priority": "NORMAL", "clarifying_question": null, "confidence": 0.99}
 
 User: hello!
-JSON: {"intent": "chat", "title": null, "date": null, "time": null, "clarifying_question": null, "confidence": 0.99}
+JSON: {"intent": "chat", "title": null, "date": null, "time": null, "category": "GENERAL", "priority": "NORMAL", "clarifying_question": null, "confidence": 0.99}
 """
 
 
@@ -199,10 +205,7 @@ class AIService:
         # Server-side deterministic resolution: the model never computes the
         # final scheduling timestamp, and a missing time becomes a question —
         # never a silently wrong alarm.
-        if parsed.intent in (
-            ParseIntent.CREATE_REMINDER,
-            ParseIntent.UPDATE_REMINDER,
-        ) and parsed.clarifying_question is None:
+        if parsed.intent == ParseIntent.CREATE_REMINDER and parsed.clarifying_question is None:
             parsed.due_at = resolve_due_at(
                 parsed.date, parsed.time, request.timezone, ref_date
             )

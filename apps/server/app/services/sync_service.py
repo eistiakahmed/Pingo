@@ -33,15 +33,20 @@ class SyncService:
     async def apply_push(
         cls, db: AsyncSession, request: SyncPushRequest
     ) -> SyncPushResponse:
+        if request.user_id is None:
+            raise ValueError("Strict tenant isolation violation: SyncPushRequest.user_id is required.")
+
         applied_count = 0
         now = datetime.now(timezone.utc)
 
-        # 1. Atomic Bulk Upsert Reminders with Last-Write-Wins
+        # 1. Atomic Bulk Upsert Reminders — Strictly Tenant-Scoped + Irreversible Auto-Completion
         if request.reminders:
             reminder_values = []
             for r in request.reminders:
                 norm_due = normalize_due_at(r.due_at)
-                already_past = bool(norm_due and norm_due < now)
+                due_reached = bool(norm_due and norm_due <= now)
+                # Zero-Touch Auto-Completion: any reminder whose due condition is met transitions irreversibly to completed
+                auto_completed = r.is_completed or due_reached
                 reminder_values.append(
                     {
                         "id": r.id,
@@ -52,12 +57,13 @@ class SyncService:
                         "key_version": r.key_version,
                         "algorithm": r.algorithm,
                         "due_at": norm_due,
-                        "is_completed": r.is_completed,
+                        "is_completed": auto_completed,
                         "version": r.version,
                         "created_at": r.created_at or now,
                         "updated_at": now,
-                        "deleted_at": r.deleted_at,
-                        "notification_sent": already_past or r.is_completed,
+                        # Manual delete deprecated: ignore client deleted_at tombstones on active/completed reminders
+                        "deleted_at": None,
+                        "notification_sent": auto_completed,
                     }
                 )
 
@@ -65,34 +71,45 @@ class SyncService:
             stmt = stmt.on_conflict_do_update(
                 index_elements=[EncryptedReminder.id],
                 set_={
-                    "user_id": stmt.excluded.user_id,
-                    "ciphertext": stmt.excluded.ciphertext,
-                    "iv": stmt.excluded.iv,
-                    "auth_tag": stmt.excluded.auth_tag,
-                    "key_version": stmt.excluded.key_version,
-                    "algorithm": stmt.excluded.algorithm,
-                    "due_at": stmt.excluded.due_at,
-                    "is_completed": stmt.excluded.is_completed,
-                    # Only re-arm notification_sent to False when due_at moves forward into the future
-                    "notification_sent": case(
-                        (
-                            (stmt.excluded.due_at > EncryptedReminder.due_at)
-                            & (stmt.excluded.due_at > now)
-                            & (stmt.excluded.is_completed.is_(False)),
-                            False,
-                        ),
-                        else_=EncryptedReminder.notification_sent,
+                    # Once completed, ciphertext and due_at are immutable; manual edits/deletes are ignored
+                    "ciphertext": case(
+                        (EncryptedReminder.is_completed.is_(True), EncryptedReminder.ciphertext),
+                        else_=stmt.excluded.ciphertext,
+                    ),
+                    "iv": case(
+                        (EncryptedReminder.is_completed.is_(True), EncryptedReminder.iv),
+                        else_=stmt.excluded.iv,
+                    ),
+                    "auth_tag": case(
+                        (EncryptedReminder.is_completed.is_(True), EncryptedReminder.auth_tag),
+                        else_=stmt.excluded.auth_tag,
+                    ),
+                    "due_at": case(
+                        (EncryptedReminder.is_completed.is_(True), EncryptedReminder.due_at),
+                        else_=stmt.excluded.due_at,
+                    ),
+                    # Strictly monotonic irreversible completion: True can NEVER revert to False
+                    "is_completed": (
+                        EncryptedReminder.is_completed | stmt.excluded.is_completed
+                    ),
+                    "notification_sent": (
+                        EncryptedReminder.notification_sent
+                        | EncryptedReminder.is_completed
+                        | stmt.excluded.is_completed
                     ),
                     "version": stmt.excluded.version,
                     "updated_at": now,
-                    "deleted_at": stmt.excluded.deleted_at,
                 },
-                where=(stmt.excluded.version >= EncryptedReminder.version),
+                # Strict tenant isolation: never allow Tenant A to overwrite Tenant B's reminder UUID!
+                where=(
+                    (EncryptedReminder.user_id == request.user_id)
+                    & (stmt.excluded.version >= EncryptedReminder.version)
+                ),
             )
             await db.execute(stmt)
             applied_count += len(request.reminders)
 
-        # 2. Atomic Bulk Upsert Vault Items with Last-Write-Wins
+        # 2. Atomic Bulk Upsert Vault Items — Strictly Tenant-Scoped
         if request.vault_items:
             vault_values = [
                 {
@@ -148,7 +165,6 @@ class SyncService:
     ) -> SyncPullResponse:
         now = datetime.now(timezone.utc)
 
-        # Query reminders
         r_query = select(EncryptedReminder).where(
             EncryptedReminder.user_id == user_id
         )
@@ -165,7 +181,7 @@ class SyncService:
                 key_version=r.key_version,
                 algorithm=r.algorithm,
                 due_at=r.due_at,
-                is_completed=r.is_completed,
+                is_completed=r.is_completed or bool(r.due_at and r.due_at <= now),
                 version=r.version,
                 created_at=r.created_at,
                 updated_at=r.updated_at,
@@ -174,7 +190,6 @@ class SyncService:
             for r in r_result.scalars().all()
         ]
 
-        # Query vault items
         v_query = select(EncryptedVaultItem).where(
             EncryptedVaultItem.user_id == user_id
         )

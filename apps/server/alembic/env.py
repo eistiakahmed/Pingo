@@ -14,6 +14,7 @@ from app.models import (
     DeviceToken,
     Reminder,
     Documentation,
+    AssistantInboxMessage,
 )
 
 config = context.config

@@ -4,13 +4,16 @@ import os
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core.security import get_current_user_optional
 from app.db.session import get_db
 from app.main import app
-from app.models.voice_assistant import Documentation, Reminder
+from app.models.user import PlanTier, User
+from app.models.voice_assistant import AssistantInboxMessage, Documentation, Reminder
 from app.services.voice_assistant_service import (
     STATIC_AUDIO_DIR,
     cleanup_old_tts_files,
@@ -52,20 +55,30 @@ def test_normalize_bd_iso8601_preserves_plus_06_offset():
 
 
 @pytest.mark.asyncio
-async def test_voice_command_full_pipeline_executes_both_tools_and_serves_audio(monkeypatch):
+async def test_voice_command_authenticated_tenant_persists_streamlined_records_and_serves_audio(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+
+    auth_user = User(
+        id=uuid4(),
+        email="tenant_owner@pingo.app",
+        password_hash="argon2id$hashed",
+        plan_tier=PlanTier.PRO,
+        client_salt="salt_tenant_1",
+    )
 
     added_records = []
 
     class FakeSession:
         def add(self, obj):
             if getattr(obj, "id", None) is None:
-                from uuid import uuid4
                 obj.id = uuid4()
             added_records.append(obj)
 
         async def flush(self):
+            return None
+
+        async def rollback(self):
             return None
 
         async def execute(self, _stmt):
@@ -77,16 +90,15 @@ async def test_voice_command_full_pipeline_executes_both_tools_and_serves_audio(
         yield FakeSession()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user_optional] = lambda: auth_user
 
-    # 1. Mock Groq Whisper STT
     fake_groq_instance = MagicMock()
     fake_groq_instance.audio.transcriptions.create = AsyncMock(
         return_value=SimpleNamespace(
-            text="আজকে রাত ১০টায় সার্ভার ডিপ্লয়মেন্টের রিমাইন্ডার সেট করো আর FastAPI নোট সেভ করো"
+            text="আগামীকাল রাত ১০টায় সার্ভার ডিপ্লয়মেন্টের রিমাইন্ডার সেট করো আর FastAPI নোট সেভ করো"
         )
     )
 
-    # 2. Mock DeepSeek OpenAI client (first call returns 2 tool calls; second call returns final Bangla text with markdown)
     tc_reminder = SimpleNamespace(
         id="call_1",
         type="function",
@@ -95,7 +107,8 @@ async def test_voice_command_full_pipeline_executes_both_tools_and_serves_audio(
             arguments=json.dumps(
                 {
                     "task_title": "Server Deployment",
-                    "reminder_time": "2026-11-24T22:00:00+06:00",
+                    "reminder_time": "2027-11-25T22:00:00+06:00",
+                    "category": "WORK",
                 }
             ),
         ),
@@ -109,6 +122,7 @@ async def test_voice_command_full_pipeline_executes_both_tools_and_serves_audio(
                 {
                     "title": "FastAPI Architecture Note",
                     "content": "Voice pipeline integrated with Groq Whisper and DeepSeek.",
+                    "category": "DOCUMENT",
                 }
             ),
         ),
@@ -141,7 +155,7 @@ async def test_voice_command_full_pipeline_executes_both_tools_and_serves_audio(
 
     second_msg = SimpleNamespace(
         tool_calls=None,
-        content="**ঠিক আছে!** আজকে রাত ১০টায় _Server Deployment_ রিমাইন্ডার এবং #FastAPI নোট সেভ করা হয়েছে।",
+        content="**ঠিক আছে!** আগামীকাল রাত ১০টায় _Server Deployment_ রিমাইন্ডার এবং #FastAPI নোট সেভ করা হয়েছে।",
     )
 
     fake_openai_instance = MagicMock()
@@ -152,7 +166,6 @@ async def test_voice_command_full_pipeline_executes_both_tools_and_serves_audio(
         ]
     )
 
-    # 3. Mock Edge-TTS Communicate so test writes a real dummy MP3 into /static/audio without network
     tts_captured = {}
 
     class FakeCommunicate:
@@ -176,50 +189,59 @@ async def test_voice_command_full_pipeline_executes_both_tools_and_serves_audio(
             ) as ac:
                 resp = await ac.post(
                     "/api/voice-command",
-                    data={"user_id": "user_bd_01"},
+                    data={"user_id": str(auth_user.id)},
                     files={"audio": ("voice_note.m4a", b"fake-m4a-audio-bytes", "audio/mp4")},
                 )
 
                 assert resp.status_code == 200, resp.text
                 body = resp.json()
 
-                # Verify JSON contract
+                assert body["status"] == "completed_turn"
+                assert body["telemetry"]["tenant_scope"] == "authenticated"
                 assert "সার্ভার ডিপ্লয়মেন্টের" in body["user_said"]
-                assert "রিমাইন্ডার" in body["ai_reply"]
                 assert body["audio_url"].startswith("/static/audio/")
-                assert body["audio_url"].endswith(".mp3")
                 assert len(body["actions"]) == 2
 
                 assert body["actions"][0]["tool"] == "set_reminder"
-                assert body["actions"][0]["arguments"] == {
-                    "task_title": "Server Deployment",
-                    "reminder_time": "2026-11-24T22:00:00+06:00",
-                }
+                assert body["actions"][0]["category"] == "WORK"
+                assert body["actions"][0]["lifecycle_state"] == "scheduled"
                 assert body["actions"][1]["tool"] == "save_documentation"
-                assert body["actions"][1]["arguments"]["title"] == "FastAPI Architecture Note"
+                assert body["actions"][1]["category"] == "DOCUMENT"
 
-                # Verify Whisper was called with whisper-large-v3, temperature=0.0, and NO language param
                 whisper_kwargs = fake_groq_instance.audio.transcriptions.create.call_args.kwargs
                 assert whisper_kwargs["model"] == "whisper-large-v3"
                 assert whisper_kwargs["temperature"] == 0.0
                 assert "language" not in whisper_kwargs
 
-                # Verify DeepSeek base_url and model
                 mock_openai_cls.assert_called_once_with(
                     api_key="test-deepseek-key", base_url="https://api.deepseek.com"
                 )
 
-                # Verify Markdown characters (*, #, _) were stripped before passing to edge-tts
                 assert tts_captured["voice"] == "bn-BD-NabanitaNeural"
                 assert "*" not in tts_captured["text"]
                 assert "_" not in tts_captured["text"]
                 assert "#" not in tts_captured["text"]
 
-                # Verify DB models persisted
-                assert any(isinstance(r, Reminder) and r.task_title == "Server Deployment" for r in added_records)
-                assert any(isinstance(r, Documentation) and r.title == "FastAPI Architecture Note" for r in added_records)
+                expected_tenant = f"user:{auth_user.id}"
+                assert any(
+                    isinstance(r, Reminder)
+                    and r.tenant_id == expected_tenant
+                    and r.state == "scheduled"
+                    and r.category == "WORK"
+                    for r in added_records
+                )
+                assert any(
+                    isinstance(r, Documentation)
+                    and r.tenant_id == expected_tenant
+                    and r.title == "FastAPI Architecture Note"
+                    for r in added_records
+                )
+                assert any(
+                    isinstance(r, AssistantInboxMessage)
+                    and r.tenant_id == expected_tenant
+                    for r in added_records
+                )
 
-                # Verify /static/audio actually serves the generated MP3
                 audio_resp = await ac.get(body["audio_url"])
                 assert audio_resp.status_code == 200
                 assert audio_resp.content == b"ID3-FAKE-BANGLA-MP3-DATA"

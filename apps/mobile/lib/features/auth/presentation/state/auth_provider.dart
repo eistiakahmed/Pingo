@@ -69,15 +69,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _restoreSession() async {
     try {
-      final token = await LocalStorageService.instance.getAuthToken();
-      final email = await LocalStorageService.instance.getUserEmail();
-      final name = await LocalStorageService.instance.getUserName();
+      final guestId =
+          await LocalStorageService.instance.getOrCreateGuestSessionId();
+      _apiClient.setGuestSessionId(guestId);
 
-      if (token != null &&
-          token.isNotEmpty &&
-          email != null &&
-          email.isNotEmpty &&
-          !email.endsWith('@pingo.internal')) {
+      final isAuthed =
+          await LocalStorageService.instance.isExplicitlyAuthenticated();
+      if (isAuthed) {
+        final token = await LocalStorageService.instance.getAuthToken();
+        final email = await LocalStorageService.instance.getUserEmail();
+        final name = await LocalStorageService.instance.getUserName();
         _apiClient.setAuthToken(token);
         state = state.copyWith(
           isInitializing: false,
@@ -90,6 +91,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     } catch (_) {}
 
+    _apiClient.setAuthToken(null);
     state = state.copyWith(
       isInitializing: false,
       isAuthenticated: false,
@@ -180,7 +182,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  void continueAsGuest() {
+  Future<void> continueAsGuest() async {
+    _apiClient.setAuthToken(null);
+    final guestId =
+        await LocalStorageService.instance.getOrCreateGuestSessionId();
+    _apiClient.setGuestSessionId(guestId);
     state = state.copyWith(
       isInitializing: false,
       isLoading: false,
@@ -194,6 +200,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _apiService.logout();
     _apiClient.setAuthToken(null);
     await LocalStorageService.instance.clearAuthSession();
+    final guestId =
+        await LocalStorageService.instance.getOrCreateGuestSessionId();
+    _apiClient.setGuestSessionId(guestId);
     state = const AuthState(
       isInitializing: false,
       isAuthenticated: false,

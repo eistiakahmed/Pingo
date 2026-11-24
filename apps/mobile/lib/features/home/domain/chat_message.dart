@@ -1,8 +1,9 @@
 import 'dart:convert';
 
-/// Immutable model representing a single conversational interaction in Pingo's chat stream.
-/// Supports WhatsApp-style AI voice replies (`audioUrl`), inline reminders,
-/// punctual alarm triggers (`isAlarmTriggeredAlert`), and encrypted document attachments.
+/// Streamlined, immutable WhatsApp-style conversational message model.
+/// Supports voice reply playback (`audioUrl`), autonomous LLM-classified reminder cards
+/// (`reminderCategory`), triggered alarm notifications (`isAlarmTriggeredAlert`),
+/// and bundled multimodal attachment metadata (`bundledAttachments`).
 class ChatMessage {
   final String id;
   final String text;
@@ -14,21 +15,11 @@ class ChatMessage {
   final String? reminderId;
   final String? reminderTitle;
   final DateTime? reminderDueAt;
-  final bool isDone;
-  final List<String> suggestedActions;
+  final String? reminderCategory;
 
-  // Integrated document attachment fields
   final String? documentTitle;
   final String? documentCategory;
-  final String? documentExpiry;
-  final String? documentIdentifier;
-  final String? filePath;
-  final int? fileSize;
-
-  // Confirmation gate fields
-  final bool isPendingConfirmation;
-  final String? pendingReminderCategory;
-  final String? pendingReminderPriority;
+  final List<String> bundledAttachments;
 
   const ChatMessage({
     required this.id,
@@ -40,23 +31,16 @@ class ChatMessage {
     this.reminderId,
     this.reminderTitle,
     this.reminderDueAt,
-    this.isDone = false,
-    this.suggestedActions = const [],
+    this.reminderCategory,
     this.documentTitle,
     this.documentCategory,
-    this.documentExpiry,
-    this.documentIdentifier,
-    this.filePath,
-    this.fileSize,
-    this.isPendingConfirmation = false,
-    this.pendingReminderCategory,
-    this.pendingReminderPriority,
+    this.bundledAttachments = const [],
   });
 
   bool get hasAudio => audioUrl != null && audioUrl!.trim().isNotEmpty;
   bool get hasReminder => reminderTitle != null && reminderDueAt != null;
-  bool get hasPendingReminder => isPendingConfirmation && hasReminder;
   bool get hasDocument => documentTitle != null && documentTitle!.isNotEmpty;
+  bool get hasBundledAttachments => bundledAttachments.isNotEmpty;
 
   ChatMessage copyWith({
     String? id,
@@ -68,18 +52,11 @@ class ChatMessage {
     String? reminderId,
     String? reminderTitle,
     DateTime? reminderDueAt,
+    String? reminderCategory,
     bool clearReminder = false,
-    bool? isDone,
-    List<String>? suggestedActions,
     String? documentTitle,
     String? documentCategory,
-    String? documentExpiry,
-    String? documentIdentifier,
-    String? filePath,
-    int? fileSize,
-    bool? isPendingConfirmation,
-    String? pendingReminderCategory,
-    String? pendingReminderPriority,
+    List<String>? bundledAttachments,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -94,22 +71,11 @@ class ChatMessage {
           clearReminder ? null : (reminderTitle ?? this.reminderTitle),
       reminderDueAt:
           clearReminder ? null : (reminderDueAt ?? this.reminderDueAt),
-      isDone: isDone ?? this.isDone,
-      suggestedActions: suggestedActions ?? this.suggestedActions,
+      reminderCategory:
+          clearReminder ? null : (reminderCategory ?? this.reminderCategory),
       documentTitle: documentTitle ?? this.documentTitle,
       documentCategory: documentCategory ?? this.documentCategory,
-      documentExpiry: documentExpiry ?? this.documentExpiry,
-      documentIdentifier: documentIdentifier ?? this.documentIdentifier,
-      filePath: filePath ?? this.filePath,
-      fileSize: fileSize ?? this.fileSize,
-      isPendingConfirmation:
-          isPendingConfirmation ?? this.isPendingConfirmation,
-      pendingReminderCategory: clearReminder
-          ? null
-          : (pendingReminderCategory ?? this.pendingReminderCategory),
-      pendingReminderPriority: clearReminder
-          ? null
-          : (pendingReminderPriority ?? this.pendingReminderPriority),
+      bundledAttachments: bundledAttachments ?? this.bundledAttachments,
     );
   }
 
@@ -124,17 +90,10 @@ class ChatMessage {
       'reminderId': reminderId,
       'reminderTitle': reminderTitle,
       'reminderDueAt': reminderDueAt?.toIso8601String(),
-      'isDone': isDone,
-      'suggestedActions': suggestedActions,
+      'reminderCategory': reminderCategory,
       'documentTitle': documentTitle,
       'documentCategory': documentCategory,
-      'documentExpiry': documentExpiry,
-      'documentIdentifier': documentIdentifier,
-      'filePath': filePath,
-      'fileSize': fileSize,
-      'isPendingConfirmation': isPendingConfirmation,
-      'pendingReminderCategory': pendingReminderCategory,
-      'pendingReminderPriority': pendingReminderPriority,
+      'bundledAttachments': bundledAttachments,
     };
   }
 
@@ -152,20 +111,13 @@ class ChatMessage {
       reminderDueAt: map['reminderDueAt'] != null
           ? DateTime.tryParse(map['reminderDueAt'] as String)
           : null,
-      isDone: map['isDone'] as bool? ?? false,
-      suggestedActions: (map['suggestedActions'] as List<dynamic>?)
+      reminderCategory: map['reminderCategory'] as String?,
+      documentTitle: map['documentTitle'] as String?,
+      documentCategory: map['documentCategory'] as String?,
+      bundledAttachments: (map['bundledAttachments'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
-      documentTitle: map['documentTitle'] as String?,
-      documentCategory: map['documentCategory'] as String?,
-      documentExpiry: map['documentExpiry'] as String?,
-      documentIdentifier: map['documentIdentifier'] as String?,
-      filePath: map['filePath'] as String?,
-      fileSize: map['fileSize'] as int?,
-      isPendingConfirmation: map['isPendingConfirmation'] as bool? ?? false,
-      pendingReminderCategory: map['pendingReminderCategory'] as String?,
-      pendingReminderPriority: map['pendingReminderPriority'] as String?,
     );
   }
 

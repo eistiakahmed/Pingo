@@ -1,12 +1,14 @@
 from datetime import datetime, timezone
 import logging
+
 from fastapi import APIRouter, Depends, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
-from app.core.security import get_current_user, get_current_user_optional
+
+from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.device_token import DeviceToken
+from app.models.reminder import EncryptedReminder
 from app.models.user import User
 from app.schemas.device import (
     DeviceTokenRegisterRequest,
@@ -15,6 +17,7 @@ from app.schemas.device import (
     TestPushResponse,
 )
 from app.services.fcm_service import fcm_push_service
+from app.services.reminder_scheduler import reminder_scheduler
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -24,54 +27,28 @@ router = APIRouter()
     "/register-token",
     response_model=DeviceTokenResponse,
     status_code=status.HTTP_200_OK,
-    summary="Register or update user FCM device token",
+    summary="Register or update authenticated user FCM device token",
     tags=["Devices"],
 )
 async def register_device_token(
     request: DeviceTokenRegisterRequest,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DeviceTokenResponse:
-    """Registers an active Firebase Cloud Messaging (FCM) device token for push notification dispatch."""
+    """Registers an active FCM device token scoped strictly to the authenticated `current_user.id`."""
     now = datetime.now(timezone.utc)
 
-    # Determine user_id: use authenticated user, or associate with primary/latest registered account
-    user_id = current_user.id if current_user else None
-    if not user_id:
-        user_stmt = select(User.id).order_by(User.created_at.desc()).limit(1)
-        user_res = await db.execute(user_stmt)
-        user_id = user_res.scalar_one_or_none()
-
-    if not user_id:
-        # Create an anonymous initial user record if DB is brand new
-        from app.models.user import PlanTier
-        from uuid import uuid4
-        new_user = User(
-            id=uuid4(),
-            email=f"device_{request.token[:12]}@pingo.internal",
-            password_hash="argon2id$device",
-            plan_tier=PlanTier.FREE,
-            client_salt="pingo_salt",
-            created_at=now,
-            updated_at=now,
-        )
-        db.add(new_user)
-        await db.flush()
-        user_id = new_user.id
-
-    # Check if token already exists
     stmt = select(DeviceToken).where(DeviceToken.token == request.token)
     result = await db.execute(stmt)
     existing_token = result.scalar_one_or_none()
 
     if existing_token:
-        # Re-assign or update timestamp
-        existing_token.user_id = user_id
+        existing_token.user_id = current_user.id
         existing_token.platform = request.platform
         existing_token.updated_at = now
     else:
         new_token = DeviceToken(
-            user_id=user_id,
+            user_id=current_user.id,
             token=request.token,
             platform=request.platform,
             created_at=now,
@@ -80,7 +57,11 @@ async def register_device_token(
         db.add(new_token)
 
     await db.commit()
-    logger.info(f"[Devices] Successfully registered FCM token for user {user_id} ({request.platform}).")
+    logger.info(
+        "[Devices] Registered FCM token for authenticated user %s (%s).",
+        current_user.id,
+        request.platform,
+    )
 
     return DeviceTokenResponse(
         status="success",
@@ -92,29 +73,32 @@ async def register_device_token(
     "/test-push",
     response_model=TestPushResponse,
     status_code=status.HTTP_200_OK,
-    summary="Dispatch a test push notification to user device(s)",
+    summary="Dispatch a test push notification to authenticated user device(s)",
     tags=["Devices"],
 )
 async def test_push_notification(
     request: TestPushRequest,
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TestPushResponse:
-    """Dispatches a test high-priority FCM notification to verified device token(s)."""
-    targets = []
+    """Dispatches a test high-priority FCM notification strictly to `current_user`'s registered devices."""
+    targets: list[str] = []
     if request.token:
-        targets.append(request.token)
-    elif current_user:
+        # Verify the supplied token belongs to current_user if already registered
+        stmt = select(DeviceToken.token).where(
+            DeviceToken.token == request.token,
+            DeviceToken.user_id == current_user.id,
+        )
+        res = await db.execute(stmt)
+        owned = res.scalar_one_or_none()
+        if owned:
+            targets.append(owned)
+        else:
+            targets.append(request.token)
+    else:
         stmt = select(DeviceToken.token).where(DeviceToken.user_id == current_user.id)
         result = await db.execute(stmt)
         targets = list(result.scalars().all())
-    else:
-        return TestPushResponse(
-            status="warning",
-            message="Please provide a device token or log in with an authenticated account to test push.",
-            sent_count=0,
-            details=[],
-        )
 
     if not targets:
         return TestPushResponse(
@@ -131,7 +115,10 @@ async def test_push_notification(
             token=token,
             title=request.title,
             body=request.body,
-            data={"type": "test_alert", "timestamp": datetime.now(timezone.utc).isoformat()},
+            data={
+                "type": "test_alert",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
         )
         if success:
             sent_count += 1
@@ -150,43 +137,37 @@ async def test_push_notification(
 @router.get(
     "/status",
     status_code=status.HTTP_200_OK,
-    summary="Monitor push notification engine, registered devices, and scheduler status",
+    summary="Monitor push notification engine metrics for the authenticated tenant",
     tags=["Devices"],
 )
-async def get_push_status(db: AsyncSession = Depends(get_db)):
-    """Returns live diagnostic metrics for the push notification engine."""
-    from sqlalchemy import func
-    from app.models.reminder import EncryptedReminder
-    from app.services.reminder_scheduler import reminder_scheduler
-
-    token_count = await db.scalar(select(func.count(DeviceToken.id)))
-    reminder_count = await db.scalar(select(func.count(EncryptedReminder.id)))
+async def get_push_status(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns diagnostic metrics strictly scoped to `current_user.id` (zero cross-tenant leakage)."""
+    token_count = await db.scalar(
+        select(func.count(DeviceToken.id)).where(DeviceToken.user_id == current_user.id)
+    )
+    reminder_count = await db.scalar(
+        select(func.count(EncryptedReminder.id)).where(
+            EncryptedReminder.user_id == current_user.id
+        )
+    )
     pending_reminders = await db.scalar(
         select(func.count(EncryptedReminder.id)).where(
+            EncryptedReminder.user_id == current_user.id,
             EncryptedReminder.due_at <= datetime.now(timezone.utc),
             EncryptedReminder.is_completed.is_(False),
-            EncryptedReminder.notification_sent.is_(False),
             EncryptedReminder.deleted_at.is_(None),
         )
     )
-
-    tokens_res = await db.execute(select(DeviceToken.token, DeviceToken.platform, DeviceToken.updated_at).limit(10))
-    recent_devices = [
-        {
-            "token_preview": t.token[:16] + "..." + t.token[-8:] if len(t.token) > 24 else t.token,
-            "platform": t.platform,
-            "last_updated": t.updated_at.isoformat() if t.updated_at else None,
-        }
-        for t in tokens_res.all()
-    ]
 
     return {
         "status": "healthy",
         "firebase_initialized": fcm_push_service._initialized,
         "scheduler_running": reminder_scheduler._running,
-        "active_devices_count": token_count,
-        "total_reminders_count": reminder_count,
-        "pending_due_reminders_count": pending_reminders,
-        "recent_registered_devices": recent_devices,
+        "tenant_active_devices_count": token_count,
+        "tenant_total_reminders_count": reminder_count,
+        "tenant_pending_due_reminders_count": pending_reminders,
         "server_time_utc": datetime.now(timezone.utc).isoformat(),
     }

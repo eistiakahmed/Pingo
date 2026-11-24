@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -20,8 +20,7 @@ def mock_authenticated_user():
 
     async def override_db():
         mock_session = AsyncMock()
-        # Mock execute returning no existing token
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
         yield mock_session

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -10,7 +11,7 @@ import 'package:pingo_mobile/features/home/data/sync_api_service.dart';
 import 'package:pingo_mobile/features/home/domain/sync_models.dart';
 import '../../domain/reminder_item.dart';
 
-/// State model for Home Screen reminder lists.
+/// State model for read-only, zero-touch Home Screen reminder lists.
 class HomeReminderState {
   final List<ReminderItem> reminders;
   final bool isLoading;
@@ -24,11 +25,8 @@ class HomeReminderState {
     this.syncError,
   });
 
-  List<ReminderItem> get todayReminders =>
-      reminders.where((r) => !r.isDone && !r.isOverdue).toList();
-
-  List<ReminderItem> get overdueReminders =>
-      reminders.where((r) => !r.isDone && r.isOverdue).toList();
+  List<ReminderItem> get scheduledReminders =>
+      reminders.where((r) => !r.isDone).toList();
 
   List<ReminderItem> get completedReminders =>
       reminders.where((r) => r.isDone).toList();
@@ -48,83 +46,136 @@ class HomeReminderState {
   }
 }
 
-/// State notifier managing home reminders with persistent local storage and cloud database sync.
+/// Zero-touch reminder lifecycle notifier.
+/// - Manual edit, manual delete, and manual completion toggles are deprecated.
+/// - Reminders transition automatically and irreversibly from `scheduled` -> `completed`
+///   when their scheduled time arrives, when a local/FCM alarm fires, or via `/sync/pull`.
+/// - Strictly disables `/sync` and `/devices` calls when unauthenticated (ephemeral guest session).
 class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
   final Ref? _ref;
+  StreamSubscription<TriggeredAlarmEvent>? _alarmSub;
+  Timer? _autoCompleteTicker;
 
   HomeReminderNotifier([this._ref])
-      : super(
-          const HomeReminderState(
-            reminders: [],
-            isLoading: false,
-          ),
-        ) {
+      : super(const HomeReminderState(reminders: [], isLoading: false)) {
     _initializePersistence();
+    _bindZeroTouchCompletionTriggers();
   }
 
-  /// Initializes local storage loading and silent background sync with PostgreSQL.
+  void _bindZeroTouchCompletionTriggers() {
+    _alarmSub = NotificationService.instance.onAlarmTriggered.listen((event) {
+      autoCompleteDueTasks(triggeredSafeId: event.id);
+    });
+
+    // Lightweight 15s check while app is active so tasks transition cleanly at their exact due minute
+    _autoCompleteTicker = Timer.periodic(const Duration(seconds: 15), (_) {
+      autoCompleteDueTasks();
+    });
+  }
+
+  @override
+  void dispose() {
+    _alarmSub?.cancel();
+    _autoCompleteTicker?.cancel();
+    super.dispose();
+  }
+
   Future<void> _initializePersistence() async {
     try {
-      // 1. Load from local device cache instantly and ensure future alarms are scheduled
+      final ref = _ref;
+      if (ref != null) {
+        final guestId =
+            await LocalStorageService.instance.getOrCreateGuestSessionId();
+        ref.read(apiClientProvider).setGuestSessionId(guestId);
+      }
+
+      // 1. Load local cache and auto-complete any reminders whose dueAt already passed
       final cached = await LocalStorageService.instance.loadReminders();
       if (cached.isNotEmpty) {
-        state = state.copyWith(reminders: cached);
-        _scheduleActiveFutureAlarms(cached);
+        final reconciled = _applyIrreversibleDueCheck(cached);
+        state = state.copyWith(reminders: reconciled);
+        LocalStorageService.instance.saveReminders(reconciled);
+        _scheduleActiveFutureAlarms(reconciled);
       }
 
-      final ref = _ref;
       if (ref == null) return;
 
-      // 2. Ensure auth session & sync with cloud PostgreSQL
+      // 2. Directive 4: Strictly disable `/sync` & `/devices` calls when unauthenticated!
+      final isAuthed =
+          await LocalStorageService.instance.isExplicitlyAuthenticated();
+      if (!isAuthed) {
+        ref.read(apiClientProvider).setAuthToken(null);
+        return;
+      }
+
+      final token = await LocalStorageService.instance.getAuthToken();
+      if (token == null || token.isEmpty) return;
+
+      final apiClient = ref.read(apiClientProvider);
       final authApi = ref.read(authApiServiceProvider);
       final syncApi = ref.read(syncApiServiceProvider);
-      final apiClient = ref.read(apiClientProvider);
+      apiClient.setAuthToken(token);
 
-      String? token = await LocalStorageService.instance.getAuthToken();
-      bool tokenValid = false;
-      if (token != null && token.isNotEmpty) {
-        apiClient.setAuthToken(token);
-        try {
-          await authApi.getMe();
-          tokenValid = true;
-        } catch (_) {
-          tokenValid = false;
-        }
+      try {
+        await authApi.getMe();
+      } catch (_) {
+        // Token expired/invalid: clear auth and remain in guest X-Session-ID mode
+        await LocalStorageService.instance.clearAuthSession();
+        apiClient.setAuthToken(null);
+        return;
       }
 
-      if (!tokenValid) {
-        final deviceId = await LocalStorageService.instance.getOrCreateDeviceId();
-        final deviceEmail =
-            'device_${deviceId.replaceAll("-", "").substring(0, 12)}@pingo.internal';
-        final devicePass = 'PingoSec_${deviceId.substring(0, 16)}!';
-
-        try {
-          final session =
-              await authApi.login(email: deviceEmail, password: devicePass);
-          token = session.accessToken;
-        } catch (_) {
-          final session =
-              await authApi.register(email: deviceEmail, password: devicePass);
-          token = session.accessToken;
-        }
-        await LocalStorageService.instance.saveAuthToken(token);
-        apiClient.setAuthToken(token);
-      }
-
-      // Register device FCM push token AFTER auth token is saved so it binds to the right user_id
       await FcmService.instance.registerActiveToken();
-
-      // Pull updates from AWS PostgreSQL
       await pullFromServer(syncApi);
     } catch (e) {
-      debugPrint('[HomeReminderNotifier] Cloud sync init warning: $e');
+      debugPrint('[HomeReminderNotifier] Init warning: $e');
     }
   }
 
-  /// Triggered immediately after a user signs in or registers an explicit account.
+  List<ReminderItem> _applyIrreversibleDueCheck(
+    List<ReminderItem> list, {
+    int? triggeredSafeId,
+  }) {
+    final now = DateTime.now();
+    return list.map((item) {
+      if (item.isDone) return item;
+      final itemSafeId = item.id.hashCode.abs() % 2147483647;
+      if (!item.dueAt.isAfter(now) ||
+          (triggeredSafeId != null && itemSafeId == triggeredSafeId)) {
+        return item.markCompleted(now);
+      }
+      return item;
+    }).toList();
+  }
+
+  /// Irreversibly transitions any due or triggered task to `completed`.
+  void autoCompleteDueTasks({int? triggeredSafeId}) {
+    if (state.reminders.isEmpty) return;
+    bool changed = false;
+    final now = DateTime.now();
+
+    final updated = state.reminders.map((item) {
+      if (item.isDone) return item;
+      final itemSafeId = item.id.hashCode.abs() % 2147483647;
+      if (!item.dueAt.isAfter(now) ||
+          (triggeredSafeId != null && itemSafeId == triggeredSafeId)) {
+        changed = true;
+        return item.markCompleted(now);
+      }
+      return item;
+    }).toList();
+
+    if (changed) {
+      state = state.copyWith(reminders: updated);
+      _persistAndSyncIfAuthenticated();
+    }
+  }
+
+  /// Triggered immediately after a user explicitly signs in or registers.
   Future<void> syncWithAuthenticatedAccount() async {
     final ref = _ref;
     if (ref == null) return;
+    if (!await LocalStorageService.instance.isExplicitlyAuthenticated()) return;
     try {
       final syncApi = ref.read(syncApiServiceProvider);
       await pushToServer(syncApi);
@@ -143,7 +194,7 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
         NotificationService.instance.scheduleReminder(
           id: item.id.hashCode,
           title: item.title,
-          body: '$timeStr · $dateStr',
+          body: '${item.category.badgeLabel} · $timeStr · $dateStr',
           scheduledDate: item.dueAt,
           isUrgent: item.category == ReminderCategory.medicine ||
               item.priority == ReminderPriority.important,
@@ -152,161 +203,67 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     }
   }
 
-  void _persistAndSync() {
-    LocalStorageService.instance.saveReminders(state.reminders);
+  Future<void> _persistAndSyncIfAuthenticated() async {
+    await LocalStorageService.instance.saveReminders(state.reminders);
     final ref = _ref;
-    if (ref != null) {
+    if (ref != null &&
+        await LocalStorageService.instance.isExplicitlyAuthenticated()) {
       final syncApi = ref.read(syncApiServiceProvider);
-      pushToServer(syncApi);
+      await pushToServer(syncApi);
     }
   }
 
-  /// Add a newly captured reminder
+  /// Registers a newly classified autonomous reminder and schedules its native exact alarm.
   void addReminder(ReminderItem item) {
+    final now = DateTime.now();
+    final effectiveItem =
+        !item.dueAt.isAfter(now) ? item.markCompleted(now) : item;
+
     state = state.copyWith(
-      reminders: [...state.reminders, item],
+      reminders: [
+        ...state.reminders.where((r) => r.id != effectiveItem.id),
+        effectiveItem,
+      ],
     );
-    if (!item.isDone) {
-      final timeStr = DateFormat.jm().format(item.dueAt);
-      final dateStr = DateFormat.MMMd().format(item.dueAt);
+
+    if (!effectiveItem.isDone) {
+      final timeStr = DateFormat.jm().format(effectiveItem.dueAt);
+      final dateStr = DateFormat.MMMd().format(effectiveItem.dueAt);
       NotificationService.instance.scheduleReminder(
-        id: item.id.hashCode,
-        title: item.title,
-        body: '$timeStr · $dateStr',
-        scheduledDate: item.dueAt,
-        isUrgent: item.category == ReminderCategory.medicine ||
-            item.priority == ReminderPriority.important,
+        id: effectiveItem.id.hashCode,
+        title: effectiveItem.title,
+        body: '${effectiveItem.category.badgeLabel} · $timeStr · $dateStr',
+        scheduledDate: effectiveItem.dueAt,
+        isUrgent: effectiveItem.category == ReminderCategory.medicine ||
+            effectiveItem.priority == ReminderPriority.important,
       );
     }
-    _persistAndSync();
+    _persistAndSyncIfAuthenticated();
   }
 
-  /// Update an existing reminder
-  void updateReminder(ReminderItem item) {
-    state = state.copyWith(
-      reminders:
-          state.reminders.map((r) => r.id == item.id ? item : r).toList(),
-    );
-    if (!item.isDone) {
-      final timeStr = DateFormat.jm().format(item.dueAt);
-      final dateStr = DateFormat.MMMd().format(item.dueAt);
-      NotificationService.instance.scheduleReminder(
-        id: item.id.hashCode,
-        title: item.title,
-        body: '$timeStr · $dateStr',
-        scheduledDate: item.dueAt,
-        isUrgent: item.category == ReminderCategory.medicine ||
-            item.priority == ReminderPriority.important,
-      );
-    } else {
-      NotificationService.instance.cancelReminder(item.id.hashCode);
-    }
-    _persistAndSync();
-  }
-
-  /// Snooze reminder by given duration
-  void snooze(String id, Duration duration) {
-    state = state.copyWith(
-      reminders: state.reminders.map((r) {
-        if (r.id == id) {
-          final updated = r.copyWith(
-            dueAt: r.dueAt.add(duration),
-            isOverdue: false,
-          );
-          final timeStr = DateFormat.jm().format(updated.dueAt);
-          final dateStr = DateFormat.MMMd().format(updated.dueAt);
-          NotificationService.instance.scheduleReminder(
-            id: updated.id.hashCode,
-            title: updated.title,
-            body: '$timeStr · $dateStr (Snoozed)',
-            scheduledDate: updated.dueAt,
-          );
-          return updated;
-        }
-        return r;
-      }).toList(),
-    );
-    _persistAndSync();
-  }
-
-  /// Toggle task completion status
-  void toggleDone(String id) {
-    state = state.copyWith(
-      reminders: state.reminders.map((r) {
-        if (r.id == id) {
-          final newDone = !r.isDone;
-          if (newDone) {
-            NotificationService.instance.cancelReminder(r.id.hashCode);
-          } else {
-            final timeStr = DateFormat.jm().format(r.dueAt);
-            final dateStr = DateFormat.MMMd().format(r.dueAt);
-            NotificationService.instance.scheduleReminder(
-              id: r.id.hashCode,
-              title: r.title,
-              body: '$timeStr · $dateStr',
-              scheduledDate: r.dueAt,
-            );
-          }
-          return r.copyWith(isDone: newDone);
-        }
-        return r;
-      }).toList(),
-    );
-    _persistAndSync();
-  }
-
-  /// Delete a reminder and push a tombstone to the cloud so it never resurrects
-  void deleteReminder(String id) {
-    final deletedItem =
-        state.reminders.where((r) => r.id == id).firstOrNull;
-    NotificationService.instance.cancelReminder(id.hashCode);
-    state = state.copyWith(
-      reminders: state.reminders.where((r) => r.id != id).toList(),
-    );
-    LocalStorageService.instance.saveReminders(state.reminders);
-    final ref = _ref;
-    if (ref != null) {
-      final syncApi = ref.read(syncApiServiceProvider);
-      if (deletedItem != null) {
-        syncApi.pushSync(
-          reminders: [
-            EncryptedReminderDto(
-              id: deletedItem.id,
-              ciphertext: CryptoHelper.toBase64(deletedItem.title),
-              iv: CryptoHelper.toBase64('0123456789ab'),
-              authTag: CryptoHelper.toBase64('abcdefghijklmnop'),
-              dueAt: deletedItem.dueAt,
-              isCompleted: deletedItem.isDone,
-              version: 2,
-              deletedAt: DateTime.now().toUtc(),
-            ),
-          ],
-        );
-      }
-      pushToServer(syncApi);
-    }
-  }
-
-  /// Pushes all local reminders to server with Zero-Knowledge encryption
+  /// Pushes reminders to server ONLY when authenticated.
   Future<bool> pushToServer(SyncApiService syncService) async {
+    if (!await LocalStorageService.instance.isExplicitlyAuthenticated()) {
+      return false;
+    }
     state = state.copyWith(isSyncing: true, syncError: null);
     try {
       final now = DateTime.now();
-      // Apply 14-day retention rule for completed reminders
       final activeList = state.reminders.where((r) {
         if (!r.isDone) return true;
         return now.difference(r.dueAt).inDays < 14;
       }).toList();
 
       final dtos = activeList.map((r) {
+        final encodedPayload = '${r.category.badgeLabel}::${r.title}';
         return EncryptedReminderDto(
           id: r.id,
-          ciphertext: CryptoHelper.toBase64(r.title),
+          ciphertext: CryptoHelper.toBase64(encodedPayload),
           iv: CryptoHelper.toBase64('0123456789ab'),
           authTag: CryptoHelper.toBase64('abcdefghijklmnop'),
           dueAt: r.dueAt,
           isCompleted: r.isDone,
-          version: 1,
+          version: r.isDone ? 2 : 1,
         );
       }).toList();
 
@@ -319,59 +276,78 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     }
   }
 
-  /// Pulls remote delta updates and merges into local list
+  /// Pulls remote delta updates ONLY when authenticated and reflects irreversible `completed` transitions.
   Future<bool> pullFromServer(SyncApiService syncService,
       {DateTime? since}) async {
+    if (!await LocalStorageService.instance.isExplicitlyAuthenticated()) {
+      return false;
+    }
     state = state.copyWith(isSyncing: true, syncError: null);
     try {
       final res = await syncService.pullSync(since: since);
       final now = DateTime.now();
 
-      final deletedIds = res.reminders
-          .where((dto) => dto.deletedAt != null)
-          .map((dto) => dto.id)
-          .toSet();
+      final existingById = {for (final r in state.reminders) r.id: r};
 
       final remoteReminders = res.reminders
           .where((dto) => dto.deletedAt == null)
           .map((dto) {
-        String decodedTitle;
+        String rawDecoded;
         try {
-          decodedTitle = CryptoHelper.fromBase64(dto.ciphertext);
+          rawDecoded = CryptoHelper.fromBase64(dto.ciphertext);
         } catch (_) {
-          decodedTitle = 'Encrypted Reminder';
+          rawDecoded = 'Reminder';
         }
+
+        ReminderCategory cat =
+            existingById[dto.id]?.category ?? ReminderCategory.general;
+        String cleanTitle = rawDecoded;
+        if (rawDecoded.contains('::')) {
+          final idx = rawDecoded.indexOf('::');
+          cat = ReminderCategory.fromBackendString(rawDecoded.substring(0, idx));
+          cleanTitle = rawDecoded.substring(idx + 2);
+        }
+
+        final dueLocal = (dto.dueAt ?? now).toLocal();
+        final existingDone = existingById[dto.id]?.isDone ?? false;
+        final isCompleted =
+            existingDone || dto.isCompleted || !dueLocal.isAfter(now);
 
         return ReminderItem(
           id: dto.id,
-          title: decodedTitle,
-          dueAt: dto.dueAt ?? DateTime.now(),
-          category: ReminderCategory.other,
-          isDone: dto.isCompleted,
+          title: cleanTitle,
+          dueAt: dueLocal,
+          category: cat,
+          state: isCompleted
+              ? TaskLifecycleState.completed
+              : TaskLifecycleState.scheduled,
+          completedAt: isCompleted
+              ? (existingById[dto.id]?.completedAt ?? dto.updatedAt ?? now)
+              : null,
         );
       }).where((r) {
-        // Enforce 14-day completed retention policy
         if (!r.isDone) return true;
         return now.difference(r.dueAt).inDays < 14;
       }).toList();
 
-      // Merge avoiding duplicate IDs and removing server-deleted tombstones
-      final currentMap = {
-        for (var r in state.reminders)
-          if (!deletedIds.contains(r.id)) r.id: r,
-      };
+      final currentMap = {for (final r in state.reminders) r.id: r};
       for (final remote in remoteReminders) {
-        currentMap[remote.id] = remote;
+        final local = currentMap[remote.id];
+        // Enforce strict monotonicity: once completed locally or remotely, stays completed
+        if (local != null && local.isDone && !remote.isDone) {
+          currentMap[remote.id] = local;
+        } else {
+          currentMap[remote.id] = remote;
+        }
       }
 
-      final merged = currentMap.values.toList();
+      final merged = _applyIrreversibleDueCheck(currentMap.values.toList());
       state = state.copyWith(
         reminders: merged,
         isSyncing: false,
       );
 
-      // Save merged list locally and ensure local alarms are registered for upcoming items
-      LocalStorageService.instance.saveReminders(merged);
+      await LocalStorageService.instance.saveReminders(merged);
       _scheduleActiveFutureAlarms(merged);
       return true;
     } catch (e) {
@@ -379,15 +355,8 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
       return false;
     }
   }
-
-  /// Clear all reminders
-  void clearAll() {
-    state = state.copyWith(reminders: []);
-    _persistAndSync();
-  }
 }
 
-/// Riverpod provider for Home reminders
 final homeReminderProvider =
     StateNotifierProvider<HomeReminderNotifier, HomeReminderState>((ref) {
   return HomeReminderNotifier(ref);

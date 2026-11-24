@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:pingo_mobile/features/home/domain/reminder_item.dart';
 
-/// Service managing offline persistent storage and automatic data retention.
+/// Service managing offline persistent storage, guest session tokens, and 14-day retention.
 class LocalStorageService {
   LocalStorageService._();
   static final LocalStorageService instance = LocalStorageService._();
@@ -14,15 +14,14 @@ class LocalStorageService {
   static const String _keyUserEmail = 'pingo_auth_user_email';
   static const String _keyUserName = 'pingo_auth_user_name';
   static const String _keyDeviceId = 'pingo_unique_device_id';
+  static const String _keyGuestSessionId = 'pingo_ephemeral_session_id';
 
-  /// Saves active reminders to local disk storage, automatically pruning
-  /// items completed more than 14 days ago according to the retention policy.
+  /// Saves reminders to local disk storage, pruning completed items older than 14 days.
   Future<void> saveReminders(List<ReminderItem> reminders) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
 
-      // Data retention: remove items completed more than 14 days ago
       final retained = reminders.where((r) {
         if (!r.isDone) return true;
         final age = now.difference(r.dueAt).inDays;
@@ -31,7 +30,9 @@ class LocalStorageService {
 
       final jsonList = retained.map((r) => r.toJson()).toList();
       await prefs.setString(_keyReminders, jsonEncode(jsonList));
-      debugPrint('[LocalStorage] Saved ${retained.length} reminders locally (auto-pruned ${reminders.length - retained.length} items >14d old).');
+      debugPrint(
+        '[LocalStorage] Saved ${retained.length} reminders locally.',
+      );
     } catch (e) {
       debugPrint('[LocalStorage] Error saving reminders: $e');
     }
@@ -47,25 +48,43 @@ class LocalStorageService {
       final decoded = jsonDecode(raw) as List<dynamic>;
       final now = DateTime.now();
 
-      final list = decoded
+      return decoded
           .map((item) => ReminderItem.fromJson(item as Map<String, dynamic>))
           .where((r) {
-            // Apply 14-day completed retention rule
             if (!r.isDone) return true;
             return now.difference(r.dueAt).inDays < 14;
           })
           .toList();
-
-      return list;
     } catch (e) {
       debugPrint('[LocalStorage] Error loading reminders: $e');
       return [];
     }
   }
 
-  /// Gets the stored JWT authentication token, if any.
+  /// Returns true ONLY when an explicit user account (non-internal) has an active JWT.
+  Future<bool> isExplicitlyAuthenticated() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_keyAuthToken);
+      final email = prefs.getString(_keyUserEmail);
+      if (token == null || token.trim().isEmpty) return false;
+      if (email == null || email.trim().isEmpty) return false;
+      if (email.endsWith('@pingo.internal')) {
+        // Purge legacy shadow device credentials so unauthenticated sessions stay strictly ephemeral
+        await prefs.remove(_keyAuthToken);
+        await prefs.remove(_keyUserEmail);
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Gets the stored JWT authentication token ONLY if explicitly authenticated.
   Future<String?> getAuthToken() async {
     try {
+      if (!await isExplicitlyAuthenticated()) return null;
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_keyAuthToken);
     } catch (e) {
@@ -97,27 +116,24 @@ class LocalStorageService {
     }
   }
 
-  /// Gets the signed-in user's email, if an explicit account is logged in.
   Future<String?> getUserEmail() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_keyUserEmail);
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
 
-  /// Gets the signed-in user's display name, if saved.
   Future<String?> getUserName() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_keyUserName);
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
 
-  /// Clears the explicit user session (token, email, and name).
   Future<void> clearAuthSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -129,7 +145,21 @@ class LocalStorageService {
     }
   }
 
-  /// Retrieves or generates a persistent anonymous device ID.
+  /// Generates and persists a local UUID session token for unauthenticated `X-Session-ID` requests.
+  Future<String> getOrCreateGuestSessionId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? sid = prefs.getString(_keyGuestSessionId);
+      if (sid == null || sid.trim().isEmpty) {
+        sid = const Uuid().v4();
+        await prefs.setString(_keyGuestSessionId, sid);
+      }
+      return sid;
+    } catch (_) {
+      return const Uuid().v4();
+    }
+  }
+
   Future<String> getOrCreateDeviceId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -139,9 +169,8 @@ class LocalStorageService {
         await prefs.setString(_keyDeviceId, deviceId);
       }
       return deviceId;
-    } catch (e) {
+    } catch (_) {
       return const Uuid().v4();
     }
   }
 }
-

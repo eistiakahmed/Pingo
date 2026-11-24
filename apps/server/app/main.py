@@ -28,7 +28,9 @@ settings = get_settings()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_AUDIO_PATH = os.path.join(BASE_DIR, "static", "audio")
+STATIC_ATTACHMENTS_PATH = os.path.join(BASE_DIR, "static", "attachments")
 os.makedirs(STATIC_AUDIO_PATH, exist_ok=True)
+os.makedirs(STATIC_ATTACHMENTS_PATH, exist_ok=True)
 
 
 @asynccontextmanager
@@ -65,8 +67,13 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler) 
 # Middlewares
 setup_middlewares(app, settings)
 
-# Mount /static/audio for generated Edge-TTS MP3 responses
+# Mount /static/audio and /static/attachments
 app.mount("/static/audio", StaticFiles(directory=STATIC_AUDIO_PATH), name="static_audio")
+app.mount(
+    "/static/attachments",
+    StaticFiles(directory=STATIC_ATTACHMENTS_PATH),
+    name="static_attachments",
+)
 
 # Root level health for standard load balancers
 app.include_router(health_router)

@@ -11,6 +11,7 @@ class ReminderCategory(str, enum.Enum):
     WORK = "WORK"
     PERSONAL = "PERSONAL"
     BIRTHDAY = "BIRTHDAY"
+    DOCUMENT = "DOCUMENT"
 
 
 class ReminderPriority(str, enum.Enum):
@@ -20,11 +21,11 @@ class ReminderPriority(str, enum.Enum):
 
 
 class ParseIntent(str, enum.Enum):
-    """Single intent the parser may return. 'set an alarm' == 'set a reminder'."""
+    """Autonomous intent set — manual delete/update workflows are deprecated."""
+
     CREATE_REMINDER = "create_reminder"
     LIST_REMINDERS = "list_reminders"
-    DELETE_REMINDER = "delete_reminder"
-    UPDATE_REMINDER = "update_reminder"
+    SAVE_DOCUMENTATION = "save_documentation"
     CHAT = "chat"
 
 
@@ -45,15 +46,15 @@ class ParseReminderRequest(BaseModel):
 
 
 class ParsedReminderData(BaseModel):
-    """Parser output. date/time are the model's structured fields (user's words kept);
-    due_at is computed server-side by deterministic resolver logic, never by the model."""
+    """Autonomous parser output with LLM-driven category & priority extraction."""
+
     intent: ParseIntent = Field(
         default=ParseIntent.CREATE_REMINDER,
-        description="create_reminder | list_reminders | delete_reminder | update_reminder | chat",
+        description="create_reminder | list_reminders | save_documentation | chat",
     )
     title: Optional[str] = Field(
         default=None,
-        description="Title built from the user's own words, never corrected or translated",
+        description="Extracted task or note title",
     )
     date: Optional[str] = Field(
         default=None,
@@ -67,7 +68,7 @@ class ParsedReminderData(BaseModel):
     )
     clarifying_question: Optional[str] = Field(
         default=None,
-        description="Exactly one short follow-up question when time/date is unclear; otherwise null",
+        description="Short follow-up question when time/date is unclear; otherwise null",
     )
     due_at: Optional[datetime] = Field(
         default=None,
@@ -75,11 +76,11 @@ class ParsedReminderData(BaseModel):
     )
     category: ReminderCategory = Field(
         default=ReminderCategory.GENERAL,
-        description="Classified category for the reminder",
+        description="Autonomously classified category for the reminder or document",
     )
     priority: ReminderPriority = Field(
         default=ReminderPriority.NORMAL,
-        description="Urgency/Priority rating",
+        description="Autonomously classified urgency/priority rating",
     )
     confidence: float = Field(
         default=1.0,
@@ -92,4 +93,3 @@ class ParsedReminderData(BaseModel):
 class ParseReminderResponse(BaseModel):
     success: bool = True
     data: ParsedReminderData
-
