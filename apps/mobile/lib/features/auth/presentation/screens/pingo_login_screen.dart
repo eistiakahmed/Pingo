@@ -8,9 +8,7 @@ import 'package:pingo_mobile/features/home/presentation/screens/pingo_home_scree
 import 'package:pingo_mobile/features/home/presentation/state/pingo_chat_provider.dart';
 import 'package:pingo_mobile/features/home/presentation/widgets/tech_canvas_background.dart';
 
-/// Pingo Login Screen — Faithful Dark-Theme Adaptation of '5. Log in.png'
-/// featuring the Headphone Penguin Mascot badge, spacious rounded inputs (16px),
-/// full-width stadium pill buttons, 'Continue with Google', and 'Continue without an account'.
+/// Pingo Login Screen — Device-Adaptive Penguin Palette (Light & Dark).
 class PingoLoginScreen extends ConsumerStatefulWidget {
   const PingoLoginScreen({super.key});
 
@@ -65,17 +63,11 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
     HapticFeedback.selectionClick();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: AppColors.inkSurface,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.inkBorder, width: 1),
-        ),
         content: Text(
           isBangla
               ? 'ইমেইল ও পাসওয়ার্ড দিয়ে লগ ইন করুন অথবা নিচে অতিথি হিসেবে চালিয়ে যান'
               : 'Use email & password above, or continue without an account below.',
-          style: const TextStyle(color: AppColors.paperWhite, fontSize: 13),
         ),
       ),
     );
@@ -92,12 +84,13 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = AppColors.of(context);
     final authState = ref.watch(authProvider);
     final isBangla =
         ref.watch(pingoChatProvider.select((s) => s.language)) == 'bn';
 
     return Scaffold(
-      backgroundColor: AppColors.inkBlack,
+      backgroundColor: p.bg,
       body: TechCanvasBackground(
         child: SafeArea(
           child: Center(
@@ -111,7 +104,6 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // ── Top Row: 64x64 Penguin Hero Badge ──
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -122,7 +114,7 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                                 color: const Color(0xFFADEAFF),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppColors.inkBorderActive,
+                                  color: p.borderActive,
                                   width: 1.5,
                                 ),
                               ),
@@ -138,13 +130,12 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
 
                         const SizedBox(height: 28),
 
-                        // ── Bold Headline & Subtitle (Matches '5. Log in.png') ──
                         Text(
                           isBangla ? 'আবার স্বাগতম' : 'Welcome back',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.paperWhite,
+                            color: p.textPrimary,
                             letterSpacing: -0.5,
                             height: 1.2,
                           ),
@@ -154,17 +145,16 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                           isBangla
                               ? 'যেকোনো ফোনে আপনার রিমাইন্ডার দেখতে লগ ইন করুন।'
                               : 'Log in to see your reminders on any phone.',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w400,
-                            color: AppColors.paperMuted,
+                            color: p.textSecondary,
                             height: 1.4,
                           ),
                         ),
 
                         const SizedBox(height: 28),
 
-                        // ── Inline Error Banner ──
                         if (authState.errorMessage != null) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -172,29 +162,26 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                               vertical: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.inkCard,
+                              color: p.card,
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: AppColors.overdue,
-                                width: 1,
-                              ),
+                              border: Border.all(color: p.danger, width: 1),
                             ),
                             child: Row(
                               children: [
                                 Container(
                                   width: 8,
                                   height: 8,
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: AppColors.overdue,
+                                    color: p.danger,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
                                     authState.errorMessage!,
-                                    style: const TextStyle(
-                                      color: AppColors.paperWhite,
+                                    style: TextStyle(
+                                      color: p.textPrimary,
                                       fontSize: 13,
                                       height: 1.4,
                                     ),
@@ -206,7 +193,6 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                           const SizedBox(height: 16),
                         ],
 
-                        // ── Email Field (56dp spacious rounded input) ──
                         TextFormField(
                           controller: _emailController,
                           focusNode: _emailFocus,
@@ -219,12 +205,13 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                             FocusScope.of(context)
                                 .requestFocus(_passwordFocus);
                           },
-                          style: const TextStyle(
-                            color: AppColors.paperWhite,
+                          style: TextStyle(
+                            color: p.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w400,
                           ),
                           decoration: _inputDecoration(
+                            p: p,
                             hintText: isBangla
                                 ? 'ইমেইল ঠিকানা'
                                 : 'Email address',
@@ -248,7 +235,6 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
 
                         const SizedBox(height: 14),
 
-                        // ── Password Field (56dp spacious rounded input) ──
                         TextFormField(
                           controller: _passwordController,
                           focusNode: _passwordFocus,
@@ -258,12 +244,13 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                           onChanged: (_) =>
                               ref.read(authProvider.notifier).clearError(),
                           onFieldSubmitted: (_) => _handleLogin(),
-                          style: const TextStyle(
-                            color: AppColors.paperWhite,
+                          style: TextStyle(
+                            color: p.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w400,
                           ),
                           decoration: _inputDecoration(
+                            p: p,
                             hintText: isBangla ? 'পাসওয়ার্ড' : 'Password',
                             prefixIcon: Icons.lock_outline_rounded,
                             suffixIcon: IconButton(
@@ -278,7 +265,7 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                                 _obscurePassword
                                     ? Icons.visibility_off_outlined
                                     : Icons.visibility_outlined,
-                                color: AppColors.paperSubtle,
+                                color: p.textMuted,
                                 size: 20,
                               ),
                               onPressed: () {
@@ -300,49 +287,47 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
 
                         const SizedBox(height: 12),
 
-                        // Helper Caption (Matches '5. Log in.png')
                         Text(
                           isBangla
                               ? 'আপনার রিমাইন্ডার ও ভল্ট এন্ড-টু-এন্ড সুরক্ষিত থাকবে।'
                               : 'Your reminders and vault stay synced and private.',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: AppColors.paperSubtle,
+                            color: p.textMuted,
                             height: 1.4,
                           ),
                         ),
 
                         const SizedBox(height: 24),
 
-                        // ── Primary Pill CTA: "Continue" (54dp height, stadium shape) ──
                         SizedBox(
                           height: 54,
                           child: ElevatedButton(
                             onPressed:
                                 authState.isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.paperWhite,
-                              foregroundColor: AppColors.inkBlack,
-                              disabledBackgroundColor: AppColors.inkSurface,
-                              disabledForegroundColor: AppColors.paperSubtle,
+                              backgroundColor: p.primaryFill,
+                              foregroundColor: p.onPrimaryFill,
+                              disabledBackgroundColor: p.surface,
+                              disabledForegroundColor: p.textMuted,
                               elevation: 0,
                               shape: const StadiumBorder(),
                             ),
                             child: authState.isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.2,
-                                      color: AppColors.inkBlack,
+                                      color: p.onPrimaryFill,
                                     ),
                                   )
                                 : Text(
                                     isBangla ? 'এগিয়ে যান' : 'Continue',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: AppColors.inkBlack,
+                                      color: p.onPrimaryFill,
                                     ),
                                   ),
                           ),
@@ -350,48 +335,37 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
 
                         const SizedBox(height: 22),
 
-                        // ── "or" Divider Row (Matches '5. Log in.png') ──
                         Row(
                           children: [
-                            const Expanded(
-                              child: Divider(
-                                color: AppColors.inkBorder,
-                                thickness: 1,
-                              ),
+                            Expanded(
+                              child: Divider(color: p.border, thickness: 1),
                             ),
                             Padding(
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 16),
                               child: Text(
                                 isBangla ? 'অথবা' : 'or',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
-                                  color: AppColors.paperSubtle,
+                                  color: p.textMuted,
                                 ),
                               ),
                             ),
-                            const Expanded(
-                              child: Divider(
-                                color: AppColors.inkBorder,
-                                thickness: 1,
-                              ),
+                            Expanded(
+                              child: Divider(color: p.border, thickness: 1),
                             ),
                           ],
                         ),
 
                         const SizedBox(height: 22),
 
-                        // ── Secondary Pill Button: "Continue with Google" ──
                         SizedBox(
                           height: 54,
                           child: OutlinedButton(
                             onPressed: () => _handleGoogleSignIn(isBangla),
                             style: OutlinedButton.styleFrom(
-                              backgroundColor: AppColors.inkCard,
-                              side: const BorderSide(
-                                color: AppColors.inkBorderActive,
-                                width: 1,
-                              ),
+                              backgroundColor: p.card,
+                              side: BorderSide(color: p.borderActive, width: 1),
                               shape: const StadiumBorder(),
                             ),
                             child: Row(
@@ -401,14 +375,14 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                                   width: 22,
                                   height: 22,
                                   alignment: Alignment.center,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.paperWhite,
+                                  decoration: BoxDecoration(
+                                    color: p.primaryFill,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'G',
                                     style: TextStyle(
-                                      color: AppColors.inkBlack,
+                                      color: p.onPrimaryFill,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -419,10 +393,10 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                                   isBangla
                                       ? 'Google দিয়ে চালিয়ে যান'
                                       : 'Continue with Google',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.paperWhite,
+                                    color: p.textPrimary,
                                   ),
                                 ),
                               ],
@@ -432,15 +406,14 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
 
                         const SizedBox(height: 44),
 
-                        // ── Bottom Links: "New to Pingo? Sign up" ──
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
                               isBangla ? 'পিঙ্গোতে নতুন? ' : 'New to Pingo? ',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
-                                color: AppColors.paperMuted,
+                                color: p.textSecondary,
                               ),
                             ),
                             InkWell(
@@ -456,10 +429,10 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                                 ),
                                 child: Text(
                                   isBangla ? 'সাইন আপ করুন' : 'Sign up',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.signalAmber,
+                                    color: p.accent,
                                   ),
                                 ),
                               ),
@@ -469,12 +442,11 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
 
                         const SizedBox(height: 12),
 
-                        // ── "Continue without an account" (Matches '5. Log in.png') ──
                         Center(
                           child: TextButton(
                             onPressed: _handleContinueAsGuest,
                             style: TextButton.styleFrom(
-                              foregroundColor: AppColors.paperMuted,
+                              foregroundColor: p.textSecondary,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 10,
@@ -484,10 +456,10 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
                               isBangla
                                   ? 'অ্যাকাউন্ট ছাড়াই চালিয়ে যান'
                                   : 'Continue without an account',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: AppColors.paperSubtle,
+                                color: p.textMuted,
                               ),
                             ),
                           ),
@@ -505,16 +477,17 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
   }
 
   InputDecoration _inputDecoration({
+    required PenguinPalette p,
     required String hintText,
     required IconData prefixIcon,
     Widget? suffixIcon,
   }) {
     return InputDecoration(
       filled: true,
-      fillColor: AppColors.inkCard,
+      fillColor: p.card,
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: AppColors.paperSubtle,
+      hintStyle: TextStyle(
+        color: p.textMuted,
         fontSize: 15,
         fontWeight: FontWeight.w400,
       ),
@@ -523,7 +496,7 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
         child: Icon(
           prefixIcon,
           size: 20,
-          color: AppColors.paperSubtle,
+          color: p.textMuted,
         ),
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 20),
@@ -531,26 +504,26 @@ class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
+        borderSide: BorderSide(color: p.border, width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
+        borderSide: BorderSide(color: p.border, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.signalAmber, width: 1.5),
+        borderSide: BorderSide(color: p.accent, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.overdue, width: 1),
+        borderSide: BorderSide(color: p.danger, width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.overdue, width: 1.5),
+        borderSide: BorderSide(color: p.danger, width: 1.5),
       ),
-      errorStyle: const TextStyle(
-        color: AppColors.overdue,
+      errorStyle: TextStyle(
+        color: p.danger,
         fontSize: 12,
         fontWeight: FontWeight.w400,
       ),

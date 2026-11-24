@@ -4,22 +4,27 @@ import 'package:pingo_mobile/core/theme/app_colors.dart';
 import '../../domain/reminder_item.dart';
 
 /// Shared category badge color helper for autonomous LLM-assigned categories.
-Color categoryBadgeColor(ReminderCategory category) {
+/// Adapts contrast for Light and Dark Penguin themes.
+Color categoryBadgeColor(ReminderCategory category, {bool isDark = true}) {
   switch (category) {
     case ReminderCategory.medicine:
-      return AppColors.categoryMedicine;
+      return isDark ? const Color(0xFFE5484D) : const Color(0xFFC93035);
     case ReminderCategory.bill:
-      return AppColors.categoryBill;
+      return isDark ? PenguinPalette.dark.accent : PenguinPalette.light.accent;
     case ReminderCategory.work:
-      return const Color(0xFF38BDF8);
+      return isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
     case ReminderCategory.personal:
-      return AppColors.paperWhite;
+      return isDark
+          ? PenguinPalette.dark.textPrimary
+          : PenguinPalette.light.textPrimary;
     case ReminderCategory.birthday:
-      return AppColors.categoryBirthday;
+      return isDark ? PenguinPalette.dark.success : PenguinPalette.light.success;
     case ReminderCategory.document:
-      return const Color(0xFFA78BFA);
+      return isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED);
     case ReminderCategory.general:
-      return AppColors.paperMuted;
+      return isDark
+          ? PenguinPalette.dark.textSecondary
+          : PenguinPalette.light.textSecondary;
   }
 }
 
@@ -33,7 +38,8 @@ class ReadOnlyTaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badgeColor = categoryBadgeColor(item.category);
+    final p = AppColors.of(context);
+    final badgeColor = categoryBadgeColor(item.category, isDark: p.isDark);
     final timeStr = DateFormat.jm().format(item.dueAt);
     final dateStr = DateFormat('d MMM').format(item.dueAt);
 
@@ -41,20 +47,20 @@ class ReadOnlyTaskCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.inkCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.inkBorder, width: 1),
+        color: p.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: p.border, width: 1),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Automated Status Indicator Dot (Sage = Completed, Amber = Scheduled)
+          // Automated Status Indicator Dot (Success = Completed, Accent = Scheduled)
           Container(
             width: 8,
             height: 8,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: item.isDone ? AppColors.success : AppColors.signalAmber,
+              color: item.isDone ? p.success : p.accent,
             ),
           ),
           const SizedBox(width: 12),
@@ -67,9 +73,7 @@ class ReadOnlyTaskCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w500,
-                    color: item.isDone
-                        ? AppColors.paperSubtle
-                        : AppColors.paperWhite,
+                    color: item.isDone ? p.textMuted : p.textPrimary,
                     decoration:
                         item.isDone ? TextDecoration.lineThrough : null,
                   ),
@@ -86,10 +90,10 @@ class ReadOnlyTaskCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: badgeColor.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(5),
+                        color: badgeColor.withValues(alpha: p.isDark ? 0.14 : 0.10),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: badgeColor.withValues(alpha: 0.38),
+                          color: badgeColor.withValues(alpha: p.isDark ? 0.34 : 0.28),
                           width: 1,
                         ),
                       ),
@@ -106,10 +110,10 @@ class ReadOnlyTaskCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       '$timeStr · $dateStr',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                        color: AppColors.paperSubtle,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        color: p.textMuted,
                       ),
                     ),
                   ],
@@ -123,7 +127,7 @@ class ReadOnlyTaskCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w600,
-              color: item.isDone ? AppColors.success : AppColors.paperMuted,
+              color: item.isDone ? p.success : p.textSecondary,
             ),
           ),
         ],

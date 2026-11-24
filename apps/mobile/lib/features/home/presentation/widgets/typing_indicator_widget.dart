@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 
-/// Quiet opacity-pulsing 3-dot status indicator displayed during parsing.
-/// No emoji, no colored sine-wave bounce, no drop shadows.
+/// Quiet opacity-pulsing status indicator displayed during assistant processing.
 class TypingIndicatorWidget extends StatefulWidget {
   final String? statusText;
 
@@ -33,15 +32,16 @@ class _TypingIndicatorWidgetState extends State<TypingIndicatorWidget>
 
   @override
   Widget build(BuildContext context) {
+    final p = AppColors.of(context);
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: AppColors.inkCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.inkBorder, width: 1),
+          color: p.card,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: p.border, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -53,9 +53,9 @@ class _TypingIndicatorWidgetState extends State<TypingIndicatorWidget>
               child: Container(
                 width: 6,
                 height: 6,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.signalAmber,
+                  color: p.accent,
                 ),
               ),
             ),
@@ -63,8 +63,8 @@ class _TypingIndicatorWidgetState extends State<TypingIndicatorWidget>
               const SizedBox(width: 8),
               Text(
                 widget.statusText!,
-                style: const TextStyle(
-                  color: AppColors.paperMuted,
+                style: TextStyle(
+                  color: p.textSecondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w400,
                 ),

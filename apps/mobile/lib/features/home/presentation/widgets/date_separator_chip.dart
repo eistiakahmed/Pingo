@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 
-/// Centred ledger date separator chip shown between message groups.
-/// Uses the Ink neutral ramp, 8px control radius, and tabular numerals.
+/// Centred adaptive date separator chip shown between message groups.
 class DateSeparatorChip extends StatelessWidget {
   final DateTime date;
   final bool isBangla;
@@ -27,22 +26,23 @@ class DateSeparatorChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = AppColors.of(context);
     return Center(
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
+        margin: const EdgeInsets.symmetric(vertical: 10),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.inkCard,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.inkBorder, width: 1),
+          color: p.card,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: p.border, width: 1),
         ),
         child: Text(
           _label,
-          style: const TextStyle(
-            fontSize: 12,
+          style: TextStyle(
+            fontSize: 11.5,
             fontWeight: FontWeight.w500,
-            fontFeatures: [FontFeature.tabularFigures()],
-            color: AppColors.paperSubtle,
+            fontFeatures: const [FontFeature.tabularFigures()],
+            color: p.textMuted,
           ),
         ),
       ),

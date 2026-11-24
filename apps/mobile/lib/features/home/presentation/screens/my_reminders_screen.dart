@@ -4,14 +4,13 @@ import 'package:pingo_mobile/core/theme/app_colors.dart';
 import '../state/home_reminder_provider.dart';
 import '../widgets/read_only_task_card.dart';
 
-/// Read-only autonomous task ledger screen.
-/// Manual edit, delete, and checkbox completion controls are removed;
-/// tasks transition automatically from `Scheduled` -> `Completed` when due.
+/// Read-only autonomous task ledger screen using the device-adaptive Penguin palette.
 class MyRemindersScreen extends ConsumerWidget {
   const MyRemindersScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final p = AppColors.of(context);
     final reminderState = ref.watch(homeReminderProvider);
 
     final scheduled = reminderState.scheduledReminders
@@ -21,34 +20,38 @@ class MyRemindersScreen extends ConsumerWidget {
       ..sort((a, b) => b.dueAt.compareTo(a.dueAt));
 
     return Scaffold(
-      backgroundColor: AppColors.inkBlack,
+      backgroundColor: p.bg,
       appBar: AppBar(
-        backgroundColor: AppColors.inkDeep,
-        foregroundColor: AppColors.paperWhite,
+        backgroundColor: p.chrome,
+        foregroundColor: p.textPrimary,
         elevation: 0,
-        shape: const Border(
-          bottom: BorderSide(color: AppColors.inkBorder, width: 1),
+        shape: Border(
+          bottom: BorderSide(color: p.border, width: 1),
         ),
-        title: const Text(
+        title: Text(
           'All tasks',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppColors.paperWhite,
+            color: p.textPrimary,
           ),
         ),
       ),
       body: scheduled.isEmpty && completed.isEmpty
-          ? _buildEmptyState()
+          ? _buildEmptyState(p)
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
               children: [
                 if (scheduled.isNotEmpty) ...[
-                  _sectionHeader('Scheduled (${scheduled.length})', AppColors.signalAmber),
+                  _sectionHeader(p, 'Scheduled (${scheduled.length})', p.accent),
                   ...scheduled.map((r) => ReadOnlyTaskCard(item: r)),
                 ],
                 if (completed.isNotEmpty) ...[
-                  _sectionHeader('Completed (${completed.length})', AppColors.success),
+                  _sectionHeader(
+                    p,
+                    'Completed (${completed.length})',
+                    p.success,
+                  ),
                   ...completed.take(20).map((r) => ReadOnlyTaskCard(item: r)),
                 ],
               ],
@@ -56,7 +59,7 @@ class MyRemindersScreen extends ConsumerWidget {
     );
   }
 
-  Widget _sectionHeader(String label, Color dotColor) {
+  Widget _sectionHeader(PenguinPalette p, String label, Color dotColor) {
     return Padding(
       padding: const EdgeInsets.only(top: 12, bottom: 10),
       child: Row(
@@ -72,10 +75,10 @@ class MyRemindersScreen extends ConsumerWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.paperMuted,
+              color: p.textSecondary,
             ),
           ),
         ],
@@ -83,7 +86,7 @@ class MyRemindersScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(PenguinPalette p) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -94,31 +97,31 @@ class MyRemindersScreen extends ConsumerWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppColors.inkCard,
+                color: p.card,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.inkBorder, width: 1),
+                border: Border.all(color: p.border, width: 1),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.schedule_rounded,
-                color: AppColors.paperSubtle,
+                color: p.textMuted,
                 size: 20,
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'No tasks yet',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: AppColors.paperWhite,
+                color: p.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Send a voice note or message in chat to schedule an alarm automatically.',
               style: TextStyle(
                 fontSize: 13,
-                color: AppColors.paperSubtle,
+                color: p.textMuted,
               ),
               textAlign: TextAlign.center,
             ),

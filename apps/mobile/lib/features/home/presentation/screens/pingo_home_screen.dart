@@ -27,14 +27,14 @@ import '../widgets/tech_canvas_background.dart';
 import '../widgets/typing_indicator_widget.dart';
 import 'my_reminders_screen.dart';
 
-/// Pingo Home Screen — Streamlined Zero-Touch Dashboard & WhatsApp Multimodal Chat:
+/// Pingo Home Screen — Device-Adaptive Penguin Dashboard & Multimodal Assistant:
 /// 1. Stage 1 (Home Dashboard):
-///    - Clean greeting header (no Cloud Synced badge clutter)
+///    - Clean greeting header with solid pattern-free Light/Dark Penguin canvas
 ///    - Circular Progress Ring visualization in *Task & usage progress*
-///    - Read-only active task cards with autonomous LLM category badges (no checkboxes/edit/quick actions)
-/// 2. Stage 2 (WhatsApp-Style Chat & Staged Multimodal Composer):
+///    - Read-only active task cards with standardized `Icons.chevron_right_rounded` navigation
+/// 2. Stage 2 (Unified Assistant Stream & Visual-Only Staged Composer):
 ///    - Decoupled attachment staging (`📎` File Picker + `📷` Direct Camera Capture -> `POST /api/attachments/stage`)
-///    - Uncommitted preview thumbnail/chip strip inside composer (no auto-send)
+///    - Visual-only 56×56 rounded preview cards inside composer (zero raw filename text)
 ///    - Atomic bundled transmission on Send (`↑`) or Hold-to-Record release (`🎙️`).
 class PingoHomeScreen extends ConsumerStatefulWidget {
   const PingoHomeScreen({super.key});
@@ -175,7 +175,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     ref.read(pingoChatProvider.notifier).startNewChat();
   }
 
-  // ───── Directive 3: Decoupled File & Direct Camera Staging (`POST /api/attachments/stage`) ─────
+  // ───── Decoupled File & Direct Camera Staging (`POST /api/attachments/stage`) ─────
 
   Future<void> _stageDocumentOrImage() async {
     HapticFeedback.lightImpact();
@@ -208,7 +208,9 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
         if (!ok && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Could not stage attachment. Check connection and file type.'),
+              content: Text(
+                'Could not stage attachment. Check connection and file type.',
+              ),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -253,7 +255,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     }
   }
 
-  // ───── WhatsApp-Style Hold-to-Record (.m4a -> /api/voice-command) ─────
+  // ───── Hold-to-Record (.m4a -> /api/voice-command) ─────
 
   Future<void> _startHoldRecording() async {
     if (_isVoiceRecording) return;
@@ -375,6 +377,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final p = AppColors.of(context);
     final chatState = ref.watch(pingoChatProvider);
     final reminderState = ref.watch(homeReminderProvider);
     final isHomeDashboard = !_isChatModeForced &&
@@ -391,25 +394,23 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
         }
       },
       child: Scaffold(
-        backgroundColor: AppColors.inkBlack,
+        backgroundColor: p.bg,
         body: TechCanvasBackground(
           child: SafeArea(
             child: Column(
               children: [
-                _buildTopBar(isHomeDashboard: isHomeDashboard),
-
+                _buildTopBar(p: p, isHomeDashboard: isHomeDashboard),
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 220),
                     switchInCurve: Curves.easeOutCubic,
                     switchOutCurve: Curves.easeInCubic,
                     child: isHomeDashboard
-                        ? _buildHomeDashboard(reminderState)
-                        : _buildChatStream(chatState, messageItems),
+                        ? _buildHomeDashboard(p, reminderState)
+                        : _buildChatStream(p, chatState, messageItems),
                   ),
                 ),
-
-                _buildComposer(chatState),
+                _buildComposer(p, chatState),
               ],
             ),
           ),
@@ -418,9 +419,12 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     );
   }
 
-  // ───────── STAGE 1: STREAMLINED HOME DASHBOARD (DIRECTIVES 1 & 2) ─────────
+  // ───────── STAGE 1: PENGUIN MINIMALIST HOME DASHBOARD ─────────
 
-  Widget _buildHomeDashboard(HomeReminderState reminderState) {
+  Widget _buildHomeDashboard(
+    PenguinPalette p,
+    HomeReminderState reminderState,
+  ) {
     final now = DateTime.now();
     final dateLabel = DateFormat('EEEE, MMM d').format(now);
 
@@ -441,22 +445,22 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
       key: const ValueKey('home_usage_dashboard'),
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
       children: [
-        // ── 1. Clean Header (Cloud synced badge completely removed) ──
+        // ── 1. Clean Greeting Header ──
         Text(
           dateLabel,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: AppColors.paperSubtle,
+            color: p.textMuted,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           _greetingTitle(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 25,
             fontWeight: FontWeight.w700,
-            color: AppColors.paperWhite,
+            color: p.textPrimary,
             letterSpacing: -0.4,
           ),
         ),
@@ -467,25 +471,24 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.inkCard,
+            color: p.card,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.inkBorder, width: 1),
+            border: Border.all(color: p.border, width: 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Task & usage progress',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.paperMuted,
+                  color: p.textSecondary,
                 ),
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
-                  // Modern Circular Progress Ring Chart
                   SizedBox(
                     width: 84,
                     height: 84,
@@ -499,10 +502,8 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                             value: progressRatio,
                             strokeWidth: 8,
                             strokeCap: StrokeCap.round,
-                            backgroundColor: AppColors.inkSurface,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppColors.success,
-                            ),
+                            backgroundColor: p.surface,
+                            valueColor: AlwaysStoppedAnimation<Color>(p.accent),
                           ),
                         ),
                         Column(
@@ -510,19 +511,21 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                           children: [
                             Text(
                               '$progressPercent%',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
-                                fontFeatures: [FontFeature.tabularFigures()],
-                                color: AppColors.paperWhite,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                                color: p.textPrimary,
                               ),
                             ),
-                            const Text(
+                            Text(
                               'done',
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w500,
-                                color: AppColors.paperSubtle,
+                                color: p.textMuted,
                               ),
                             ),
                           ],
@@ -531,24 +534,24 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                     ),
                   ),
                   const SizedBox(width: 20),
-
-                  // Streamlined Scheduled vs Completed Metric Tiles
                   Expanded(
                     child: Row(
                       children: [
                         Expanded(
                           child: _buildMetricTile(
+                            p: p,
                             label: 'Scheduled',
                             count: scheduledList.length,
-                            dotColor: AppColors.signalAmber,
+                            dotColor: p.accent,
                           ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: _buildMetricTile(
+                            p: p,
                             label: 'Completed',
                             count: completedList.length,
-                            dotColor: AppColors.success,
+                            dotColor: p.success,
                           ),
                         ),
                       ],
@@ -560,22 +563,24 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
           ),
         ),
 
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
 
-        // ── 3. Read-Only Autonomous Active Tasks Section (No checkboxes / No Quick Actions) ──
+        // ── 3. Read-Only Tasks Section with Standardized Chevron Icon Button ──
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Remaining tasks',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: AppColors.paperWhite,
+                color: p.textPrimary,
               ),
             ),
-            InkWell(
-              onTap: () {
+            IconButton(
+              key: const ValueKey('see_all_tasks_button'),
+              tooltip: 'View all tasks',
+              onPressed: () {
                 HapticFeedback.selectionClick();
                 Navigator.push(
                   context,
@@ -584,54 +589,53 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                   ),
                 );
               },
-              borderRadius: BorderRadius.circular(6),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                child: Text(
-                  'See all →',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.signalAmber,
-                  ),
-                ),
+              style: IconButton.styleFrom(
+                backgroundColor: p.card,
+                foregroundColor: p.accent,
+                side: BorderSide(color: p.border, width: 1),
+                minimumSize: const Size(38, 38),
+                padding: EdgeInsets.zero,
+              ),
+              icon: const Icon(
+                Icons.chevron_right_rounded,
+                size: 22,
               ),
             ),
           ],
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
 
         if (visibleActiveTasks.isEmpty)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             decoration: BoxDecoration(
-              color: AppColors.inkCard,
+              color: p.card,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.inkBorder, width: 1),
+              border: Border.all(color: p.border, width: 1),
             ),
-            child: const Column(
+            child: Column(
               children: [
                 Icon(
                   Icons.check_circle_outline_rounded,
                   size: 26,
-                  color: AppColors.success,
+                  color: p.success,
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   'All caught up',
                   style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.paperWhite,
+                    color: p.textPrimary,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Send a message, attach a file, or hold the mic below to schedule a new task.',
                   style: TextStyle(
                     fontSize: 12.5,
-                    color: AppColors.paperSubtle,
+                    color: p.textMuted,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -645,6 +649,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
   }
 
   Widget _buildMetricTile({
+    required PenguinPalette p,
     required String label,
     required int count,
     required Color dotColor,
@@ -660,9 +665,9 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.inkSurface,
+          color: p.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.inkBorder, width: 1),
+          border: Border.all(color: p.border, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -681,10 +686,10 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                 Expanded(
                   child: Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.paperMuted,
+                      color: p.textSecondary,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -694,11 +699,11 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
             const SizedBox(height: 6),
             Text(
               '$count',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                fontFeatures: [FontFeature.tabularFigures()],
-                color: AppColors.paperWhite,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: p.textPrimary,
               ),
             ),
           ],
@@ -707,9 +712,10 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     );
   }
 
-  // ───────── STAGE 2: WHATSAPP-STYLE CHAT STREAM ─────────
+  // ───────── STAGE 2: UNIFIED ASSISTANT STREAM ─────────
 
   Widget _buildChatStream(
+    PenguinPalette p,
     PingoChatState chatState,
     List<Widget> messageItems,
   ) {
@@ -727,7 +733,7 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                 decoration: BoxDecoration(
                   color: const Color(0xFFADEAFF),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.inkBorderActive, width: 1),
+                  border: Border.all(color: p.borderActive, width: 1),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Image.asset(
@@ -736,12 +742,12 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Send a message, stage an attachment, or hold the mic to speak',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.paperMuted,
+                  color: p.textSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -784,13 +790,16 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
 
   // ───────────────────────────── TOP BAR ─────────────────────────────
 
-  Widget _buildTopBar({required bool isHomeDashboard}) {
+  Widget _buildTopBar({
+    required PenguinPalette p,
+    required bool isHomeDashboard,
+  }) {
     return Container(
       height: 58,
       padding: const EdgeInsets.only(left: 16, right: 8),
-      decoration: const BoxDecoration(
-        color: AppColors.inkDeep,
-        border: Border(bottom: BorderSide(color: AppColors.inkBorder, width: 1)),
+      decoration: BoxDecoration(
+        color: p.chrome,
+        border: Border(bottom: BorderSide(color: p.border, width: 1)),
       ),
       child: Row(
         children: [
@@ -802,27 +811,26 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppColors.inkCard,
+                  color: p.surface,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.inkBorderActive, width: 1),
+                  border: Border.all(color: p.border, width: 1),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.arrow_back_rounded,
                   size: 18,
-                  color: AppColors.paperWhite,
+                  color: p.textPrimary,
                 ),
               ),
             ),
             const SizedBox(width: 10),
           ],
-
           Container(
             width: 32,
             height: 32,
             decoration: BoxDecoration(
               color: const Color(0xFFADEAFF),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.inkBorder, width: 1),
+              border: Border.all(color: p.border, width: 1),
             ),
             clipBehavior: Clip.antiAlias,
             child: Image.asset(
@@ -836,26 +844,25 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
             child: Row(
               children: [
                 Text(
-                  isHomeDashboard ? 'Pingo' : 'Pingo Chat',
-                  style: const TextStyle(
+                  isHomeDashboard ? 'Pingo' : 'Assistant',
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.paperWhite,
+                    color: p.textPrimary,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.success,
+                    color: p.accent,
                   ),
                 ),
               ],
             ),
           ),
-
           if (isHomeDashboard)
             InkWell(
               onTap: () {
@@ -864,61 +871,61 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                   _isChatModeForced = true;
                 });
               },
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppColors.inkCard,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.inkBorderActive, width: 1),
+                  color: p.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: p.border, width: 1),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.chat_bubble_outline_rounded,
                       size: 14,
-                      color: AppColors.paperWhite,
+                      color: p.textPrimary,
                     ),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Text(
                       'Chat',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.paperWhite,
+                        color: p.textPrimary,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-
           PopupMenuButton<String>(
-            icon: const Icon(
+            icon: Icon(
               Icons.more_vert_rounded,
-              color: AppColors.paperMuted,
-              size: 18,
+              color: p.textSecondary,
+              size: 19,
             ),
-            color: AppColors.inkCard,
+            color: p.card,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: AppColors.inkBorder, width: 1),
+              side: BorderSide(color: p.border, width: 1),
             ),
             itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'home_dashboard',
-                child: _menuItem(Icons.dashboard_outlined, 'Home dashboard'),
+                child: _menuItem(p, Icons.dashboard_outlined, 'Home dashboard'),
               ),
               PopupMenuItem(
                 value: 'my_reminders',
-                child: _menuItem(Icons.list_alt_rounded, 'All tasks'),
+                child: _menuItem(p, Icons.list_alt_rounded, 'All tasks'),
               ),
               const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'auth_action',
                 child: _menuItem(
+                  p,
                   ref.read(authProvider).isAuthenticated
                       ? Icons.logout_rounded
                       : Icons.person_outline_rounded,
@@ -957,29 +964,29 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
     );
   }
 
-  Widget _menuItem(IconData icon, String label) {
+  Widget _menuItem(PenguinPalette p, IconData icon, String label) {
     return Row(
       children: [
         SizedBox(
           width: 18,
-          child: Icon(icon, size: 18, color: AppColors.paperMuted),
+          child: Icon(icon, size: 18, color: p.textSecondary),
         ),
         const SizedBox(width: 10),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w400,
-            color: AppColors.paperWhite,
+            color: p.textPrimary,
           ),
         ),
       ],
     );
   }
 
-  // ───────── MULTIMODAL COMPOSER (STAGED PREVIEW + CAMERA + CLIP + MIC) ─────────
+  // ───────── MULTIMODAL COMPOSER (VISUAL-ONLY STAGED CARDS + CAMERA + CLIP + MIC) ─────────
 
-  Widget _buildComposer(PingoChatState chatState) {
+  Widget _buildComposer(PenguinPalette p, PingoChatState chatState) {
     final canSend =
         (_hasInputText || chatState.stagedAttachments.isNotEmpty) &&
             !_isVoiceRecording;
@@ -988,12 +995,10 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.inkCard,
-          borderRadius: BorderRadius.circular(22),
+          color: p.card,
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: _isVoiceRecording
-                ? AppColors.overdue
-                : AppColors.inkBorderActive,
+            color: _isVoiceRecording ? p.danger : p.borderActive,
             width: 1,
           ),
         ),
@@ -1002,50 +1007,43 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Uncommitted Staged Attachment Preview Strip (Decoupled — does NOT auto-send)
+            // Visual-Only Staged Attachment Strip (56×56 rounded cards, zero raw filename text)
             if (chatState.stagedAttachments.isNotEmpty ||
                 chatState.isStagingAttachment)
               Padding(
-                padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+                padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
                       ...chatState.stagedAttachments.map(
-                        (item) => _buildStagedPreviewChip(item),
+                        (item) => StagedAttachmentPreviewCard(
+                          key: ValueKey('staged_card_${item.stagingId}'),
+                          item: item,
+                          onRemove: () {
+                            ref
+                                .read(pingoChatProvider.notifier)
+                                .removeStagedPreview(item.stagingId);
+                          },
+                        ),
                       ),
                       if (chatState.isStagingAttachment)
                         Container(
-                          height: 44,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          width: 56,
+                          height: 56,
+                          alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: AppColors.inkSurface,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: AppColors.inkBorder,
-                              width: 1,
-                            ),
+                            color: p.surface,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: p.border, width: 1),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.signalAmber,
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Staging...',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.paperMuted,
-                                ),
-                              ),
-                            ],
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: p.accent,
+                            ),
                           ),
                         ),
                     ],
@@ -1068,28 +1066,28 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                     child: Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.overdue,
+                        color: p.danger,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     _formatRecTimer(_recElapsed),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                      color: AppColors.paperWhite,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: p.textPrimary,
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Recording... release to send',
                       style: TextStyle(
-                        color: AppColors.paperMuted,
+                        color: p.textSecondary,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w500,
                       ),
@@ -1101,26 +1099,26 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                   InkWell(
                     onTap: _stageDocumentOrImage,
                     borderRadius: BorderRadius.circular(999),
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 36,
                       height: 36,
                       child: Icon(
                         Icons.attach_file_rounded,
-                        color: AppColors.paperMuted,
+                        color: p.textSecondary,
                         size: 19,
                       ),
                     ),
                   ),
-                  // Dedicated Direct Camera Capture Button (`ImageSource.camera` -> `/api/attachments/stage`)
+                  // Direct Camera Capture (`ImageSource.camera` -> `/api/attachments/stage`)
                   InkWell(
                     onTap: _capturePhotoAndStage,
                     borderRadius: BorderRadius.circular(999),
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 36,
                       height: 36,
                       child: Icon(
                         Icons.camera_alt_outlined,
-                        color: AppColors.paperMuted,
+                        color: p.textSecondary,
                         size: 19,
                       ),
                     ),
@@ -1132,8 +1130,8 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                       maxLines: 4,
                       minLines: 1,
                       textInputAction: TextInputAction.send,
-                      style: const TextStyle(
-                        color: AppColors.paperWhite,
+                      style: TextStyle(
+                        color: p.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
                         height: 1.4,
@@ -1143,8 +1141,8 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                         hintText: chatState.stagedAttachments.isNotEmpty
                             ? 'Add instructions or hold mic...'
                             : 'Message or hold mic...',
-                        hintStyle: const TextStyle(
-                          color: AppColors.paperSubtle,
+                        hintStyle: TextStyle(
+                          color: p.textMuted,
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
                         ),
@@ -1160,20 +1158,19 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                   ),
                 ],
                 const SizedBox(width: 6),
-
                 if (canSend)
                   GestureDetector(
                     onTap: _handleSend,
                     child: Container(
                       width: 40,
                       height: 40,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.paperWhite,
+                        color: p.primaryFill,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.arrow_upward_rounded,
-                        color: AppColors.inkBlack,
+                        color: p.onPrimaryFill,
                         size: 20,
                       ),
                     ),
@@ -1201,15 +1198,11 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
                       height: _isVoiceRecording ? 44 : 40,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _isVoiceRecording
-                            ? AppColors.overdue
-                            : AppColors.success,
+                        color: _isVoiceRecording ? p.danger : p.accent,
                       ),
                       child: Icon(
                         Icons.mic_rounded,
-                        color: _isVoiceRecording
-                            ? AppColors.paperWhite
-                            : AppColors.inkBlack,
+                        color: _isVoiceRecording ? Colors.white : p.onAccent,
                         size: 20,
                       ),
                     ),
@@ -1221,79 +1214,94 @@ class _PingoHomeScreenState extends ConsumerState<PingoHomeScreen>
       ),
     );
   }
+}
 
-  Widget _buildStagedPreviewChip(StagedAttachmentPreviewItem item) {
+/// Visual-only 56×56 rounded preview card for a staged composer attachment.
+/// Displays strictly the visual thumbnail (or clean file icon) plus a corner
+/// dismiss control — zero raw filename text box.
+class StagedAttachmentPreviewCard extends StatelessWidget {
+  final StagedAttachmentPreviewItem item;
+  final VoidCallback onRemove;
+
+  const StagedAttachmentPreviewCard({
+    super.key,
+    required this.item,
+    required this.onRemove,
+  });
+
+  IconData _fileIconForMime(String mimeType) {
+    final lower = mimeType.toLowerCase();
+    if (lower.contains('pdf')) return Icons.picture_as_pdf_outlined;
+    if (lower.startsWith('image/')) return Icons.image_outlined;
+    return Icons.description_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppColors.of(context);
     final hasLocalImage = item.isImage &&
         item.localPath != null &&
         File(item.localPath!).existsSync();
 
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.inkSurface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.inkBorderActive, width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (hasLocalImage)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Image.file(
-                File(item.localPath!),
-                width: 32,
-                height: 32,
-                fit: BoxFit.cover,
-              ),
-            )
-          else
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                color: AppColors.inkCard,
-                borderRadius: BorderRadius.circular(6),
+                color: p.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: p.borderActive, width: 1),
               ),
-              child: const Icon(
-                Icons.insert_drive_file_outlined,
-                size: 16,
-                color: AppColors.signalAmber,
+              clipBehavior: Clip.antiAlias,
+              child: hasLocalImage
+                  ? Image.file(
+                      File(item.localPath!),
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                    )
+                  : Center(
+                      child: Icon(
+                        _fileIconForMime(item.mimeType),
+                        size: 24,
+                        color: p.accent,
+                      ),
+                    ),
+            ),
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Semantics(
+                button: true,
+                label: 'Remove staged attachment',
+                child: GestureDetector(
+                  onTap: onRemove,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: p.primaryFill,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: p.card, width: 1.5),
+                    ),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 12,
+                      color: p.onPrimaryFill,
+                    ),
+                  ),
+                ),
               ),
             ),
-          const SizedBox(width: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 130),
-            child: Text(
-              item.filename,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.paperWhite,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 6),
-          InkWell(
-            onTap: () {
-              ref
-                  .read(pingoChatProvider.notifier)
-                  .removeStagedPreview(item.stagingId);
-            },
-            borderRadius: BorderRadius.circular(999),
-            child: const Padding(
-              padding: EdgeInsets.all(2),
-              child: Icon(
-                Icons.close_rounded,
-                size: 15,
-                color: AppColors.paperMuted,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

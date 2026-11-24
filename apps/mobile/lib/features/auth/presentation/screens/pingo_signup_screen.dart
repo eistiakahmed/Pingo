@@ -7,10 +7,7 @@ import 'package:pingo_mobile/features/home/presentation/screens/pingo_home_scree
 import 'package:pingo_mobile/features/home/presentation/state/pingo_chat_provider.dart';
 import 'package:pingo_mobile/features/home/presentation/widgets/tech_canvas_background.dart';
 
-/// Pingo Sign Up Screen — Faithful Dark-Theme Adaptation of '6. Sign up.png'
-/// featuring circular back button + Penguin badge, bold 'Create your account',
-/// spacious 16px rounded inputs, 'I speak: English / বাংলা / Both' pills,
-/// privacy agreement checkbox, and full-width stadium 'Create account' CTA.
+/// Pingo Sign Up Screen — Device-Adaptive Penguin Palette (Light & Dark).
 class PingoSignupScreen extends ConsumerStatefulWidget {
   const PingoSignupScreen({super.key});
 
@@ -59,12 +56,10 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
       final isBangla = ref.read(pingoChatProvider).language == 'bn';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.inkSurface,
           content: Text(
             isBangla
                 ? 'অনুগ্রহ করে শর্তাবলী এবং গোপনীয়তা নীতিতে সম্মতি দিন'
                 : 'Please agree to the Terms and Privacy Policy to continue.',
-            style: const TextStyle(color: AppColors.paperWhite),
           ),
         ),
       );
@@ -96,12 +91,13 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = AppColors.of(context);
     final authState = ref.watch(authProvider);
     final isBangla =
         ref.watch(pingoChatProvider.select((s) => s.language)) == 'bn';
 
     return Scaffold(
-      backgroundColor: AppColors.inkBlack,
+      backgroundColor: p.bg,
       body: TechCanvasBackground(
         child: SafeArea(
           child: Center(
@@ -115,7 +111,6 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // ── Top Bar: Circular Back Button + Penguin Mascot Pill ──
                         Row(
                           children: [
                             InkWell(
@@ -125,17 +120,17 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                                 width: 46,
                                 height: 46,
                                 decoration: BoxDecoration(
-                                  color: AppColors.inkCard,
+                                  color: p.card,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: AppColors.inkBorderActive,
+                                    color: p.borderActive,
                                     width: 1,
                                   ),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.chevron_left_rounded,
                                   size: 24,
-                                  color: AppColors.paperWhite,
+                                  color: p.textPrimary,
                                 ),
                               ),
                             ),
@@ -146,12 +141,9 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.inkCard,
+                                color: p.card,
                                 borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: AppColors.inkBorder,
-                                  width: 1,
-                                ),
+                                border: Border.all(color: p.border, width: 1),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -166,12 +158,12 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  const Text(
+                                  Text(
                                     'Pingo',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: AppColors.paperWhite,
+                                      color: p.textPrimary,
                                     ),
                                   ),
                                 ],
@@ -182,15 +174,14 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
 
                         const SizedBox(height: 24),
 
-                        // ── Headline & Subtitle (Matches '6. Sign up.png') ──
                         Text(
                           isBangla
                               ? 'অ্যাকাউন্ট তৈরি করুন'
                               : 'Create your account',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.paperWhite,
+                            color: p.textPrimary,
                             letterSpacing: -0.5,
                             height: 1.2,
                           ),
@@ -200,17 +191,16 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                           isBangla
                               ? 'এক মিনিটেরও কম সময় লাগবে।'
                               : 'It takes less than a minute.',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w400,
-                            color: AppColors.paperMuted,
+                            color: p.textSecondary,
                             height: 1.4,
                           ),
                         ),
 
                         const SizedBox(height: 24),
 
-                        // ── Inline Error Banner ──
                         if (authState.errorMessage != null) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -218,29 +208,26 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                               vertical: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.inkCard,
+                              color: p.card,
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: AppColors.overdue,
-                                width: 1,
-                              ),
+                              border: Border.all(color: p.danger, width: 1),
                             ),
                             child: Row(
                               children: [
                                 Container(
                                   width: 8,
                                   height: 8,
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: AppColors.overdue,
+                                    color: p.danger,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
                                     authState.errorMessage!,
-                                    style: const TextStyle(
-                                      color: AppColors.paperWhite,
+                                    style: TextStyle(
+                                      color: p.textPrimary,
                                       fontSize: 13,
                                       height: 1.4,
                                     ),
@@ -252,7 +239,6 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                           const SizedBox(height: 16),
                         ],
 
-                        // ── 1. Your Name Field (56dp rounded input) ──
                         TextFormField(
                           controller: _nameController,
                           focusNode: _nameFocus,
@@ -261,12 +247,13 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                           onFieldSubmitted: (_) {
                             FocusScope.of(context).requestFocus(_emailFocus);
                           },
-                          style: const TextStyle(
-                            color: AppColors.paperWhite,
+                          style: TextStyle(
+                            color: p.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w400,
                           ),
                           decoration: _inputDecoration(
+                            p: p,
                             hintText: isBangla ? 'আপনার নাম' : 'Your name',
                             prefixIcon: Icons.person_outline_rounded,
                           ),
@@ -274,7 +261,6 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
 
                         const SizedBox(height: 14),
 
-                        // ── 2. Email Field (56dp rounded input) ──
                         TextFormField(
                           controller: _emailController,
                           focusNode: _emailFocus,
@@ -287,12 +273,13 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                             FocusScope.of(context)
                                 .requestFocus(_passwordFocus);
                           },
-                          style: const TextStyle(
-                            color: AppColors.paperWhite,
+                          style: TextStyle(
+                            color: p.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w400,
                           ),
                           decoration: _inputDecoration(
+                            p: p,
                             hintText: isBangla
                                 ? 'ইমেইল ঠিকানা'
                                 : 'Email address',
@@ -316,7 +303,6 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
 
                         const SizedBox(height: 14),
 
-                        // ── 3. Password Field (56dp rounded input) ──
                         TextFormField(
                           controller: _passwordController,
                           focusNode: _passwordFocus,
@@ -326,12 +312,13 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                           onChanged: (_) =>
                               ref.read(authProvider.notifier).clearError(),
                           onFieldSubmitted: (_) => _handleSignup(),
-                          style: const TextStyle(
-                            color: AppColors.paperWhite,
+                          style: TextStyle(
+                            color: p.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w400,
                           ),
                           decoration: _inputDecoration(
+                            p: p,
                             hintText: isBangla
                                 ? 'পাসওয়ার্ড (কমপক্ষে ৮ অক্ষর)'
                                 : 'Password (8+ characters)',
@@ -348,7 +335,7 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                                 _obscurePassword
                                     ? Icons.visibility_off_outlined
                                     : Icons.visibility_outlined,
-                                color: AppColors.paperSubtle,
+                                color: p.textMuted,
                                 size: 20,
                               ),
                               onPressed: () {
@@ -370,7 +357,6 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
 
                         const SizedBox(height: 22),
 
-                        // ── Terms & Privacy Checkbox Row (Matches '6. Sign up.png') ──
                         InkWell(
                           onTap: () {
                             HapticFeedback.selectionClick();
@@ -389,22 +375,21 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                                   height: 22,
                                   margin: const EdgeInsets.only(top: 1),
                                   decoration: BoxDecoration(
-                                    color: _agreedToPrivacy
-                                        ? AppColors.signalAmber
-                                        : AppColors.inkCard,
+                                    color:
+                                        _agreedToPrivacy ? p.accent : p.card,
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
                                       color: _agreedToPrivacy
-                                          ? AppColors.signalAmber
-                                          : AppColors.inkBorderActive,
+                                          ? p.accent
+                                          : p.borderActive,
                                       width: 1.5,
                                     ),
                                   ),
                                   child: _agreedToPrivacy
-                                      ? const Icon(
+                                      ? Icon(
                                           Icons.check_rounded,
                                           size: 16,
-                                          color: AppColors.inkBlack,
+                                          color: p.onAccent,
                                         )
                                       : null,
                                 ),
@@ -414,9 +399,9 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                                     isBangla
                                         ? 'আমি শর্তাবলী এবং গোপনীয়তা নীতিতে সম্মত। আমার রিমাইন্ডার এবং ডকুমেন্ট সম্পূর্ণ গোপন থাকবে।'
                                         : 'I agree to the Terms and the Privacy Policy. My reminders and documents stay private.',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13.5,
-                                      color: AppColors.paperMuted,
+                                      color: p.textSecondary,
                                       height: 1.45,
                                     ),
                                   ),
@@ -428,37 +413,36 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
 
                         const SizedBox(height: 36),
 
-                        // ── Primary Pill CTA: "Create account" (54dp stadium) ──
                         SizedBox(
                           height: 54,
                           child: ElevatedButton(
                             onPressed:
                                 authState.isLoading ? null : _handleSignup,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.paperWhite,
-                              foregroundColor: AppColors.inkBlack,
-                              disabledBackgroundColor: AppColors.inkSurface,
-                              disabledForegroundColor: AppColors.paperSubtle,
+                              backgroundColor: p.primaryFill,
+                              foregroundColor: p.onPrimaryFill,
+                              disabledBackgroundColor: p.surface,
+                              disabledForegroundColor: p.textMuted,
                               elevation: 0,
                               shape: const StadiumBorder(),
                             ),
                             child: authState.isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.2,
-                                      color: AppColors.inkBlack,
+                                      color: p.onPrimaryFill,
                                     ),
                                   )
                                 : Text(
                                     isBangla
                                         ? 'অ্যাকাউন্ট তৈরি করুন'
                                         : 'Create account',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: AppColors.inkBlack,
+                                      color: p.onPrimaryFill,
                                     ),
                                   ),
                           ),
@@ -466,7 +450,6 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
 
                         const SizedBox(height: 18),
 
-                        // ── Bottom Link: "Already have an account? Log in" ──
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -474,9 +457,9 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                               isBangla
                                   ? 'ইতিমধ্যে অ্যাকাউন্ট আছে? '
                                   : 'Already have an account? ',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
-                                color: AppColors.paperMuted,
+                                color: p.textSecondary,
                               ),
                             ),
                             InkWell(
@@ -492,10 +475,10 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
                                 ),
                                 child: Text(
                                   isBangla ? 'লগ ইন করুন' : 'Log in',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.signalAmber,
+                                    color: p.accent,
                                   ),
                                 ),
                               ),
@@ -515,16 +498,17 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
   }
 
   InputDecoration _inputDecoration({
+    required PenguinPalette p,
     required String hintText,
     required IconData prefixIcon,
     Widget? suffixIcon,
   }) {
     return InputDecoration(
       filled: true,
-      fillColor: AppColors.inkCard,
+      fillColor: p.card,
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: AppColors.paperSubtle,
+      hintStyle: TextStyle(
+        color: p.textMuted,
         fontSize: 15,
         fontWeight: FontWeight.w400,
       ),
@@ -533,7 +517,7 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
         child: Icon(
           prefixIcon,
           size: 20,
-          color: AppColors.paperSubtle,
+          color: p.textMuted,
         ),
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 20),
@@ -541,26 +525,26 @@ class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
+        borderSide: BorderSide(color: p.border, width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
+        borderSide: BorderSide(color: p.border, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.signalAmber, width: 1.5),
+        borderSide: BorderSide(color: p.accent, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.overdue, width: 1),
+        borderSide: BorderSide(color: p.danger, width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.overdue, width: 1.5),
+        borderSide: BorderSide(color: p.danger, width: 1.5),
       ),
-      errorStyle: const TextStyle(
-        color: AppColors.overdue,
+      errorStyle: TextStyle(
+        color: p.danger,
         fontSize: 12,
         fontWeight: FontWeight.w400,
       ),

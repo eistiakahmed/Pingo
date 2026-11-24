@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'features/auth/presentation/screens/pingo_login_screen.dart';
@@ -19,7 +18,6 @@ class PingoApp extends ConsumerWidget {
     Widget homeScreen;
     if (authState.isInitializing) {
       homeScreen = const Scaffold(
-        backgroundColor: AppColors.inkBlack,
         body: SizedBox.expand(),
       );
     } else if (authState.isAuthenticated || authState.isGuest) {
