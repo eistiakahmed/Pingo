@@ -30,6 +30,7 @@ services:
       DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-pingo_user}:${POSTGRES_PASSWORD}@postgres:5432/pingo_db"
       AI_PROVIDER: "${AI_PROVIDER:-deepseek}"
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
       SECRET_KEY: "${SECRET_KEY}"
     depends_on:

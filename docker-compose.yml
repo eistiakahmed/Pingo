@@ -15,6 +15,7 @@ services:
       DATABASE_URL: "${DATABASE_URL:-postgresql+asyncpg://pingo_user:pingo_password@dd-postgres:5432/pingo_db}"
       AI_PROVIDER: "${AI_PROVIDER:-deepseek}"
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
       SECRET_KEY: "${SECRET_KEY:-pingo-development-secret-key-at-least-32-chars-long}"
     volumes:

@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
 import 'package:pingo_mobile/features/auth/presentation/state/auth_provider.dart';
-import 'package:pingo_mobile/features/onboarding/presentation/screens/pingo_permissions_screen.dart';
+import 'package:pingo_mobile/features/home/presentation/screens/pingo_home_screen.dart';
+import 'package:pingo_mobile/features/home/presentation/state/pingo_chat_provider.dart';
+import 'package:pingo_mobile/features/home/presentation/widgets/tech_canvas_background.dart';
 
-/// Screen implementing '6. Sign up.png' connected to Pingo API.
+/// Pingo Sign Up Screen — Faithful Dark-Theme Adaptation of '6. Sign up.png'
+/// featuring circular back button + Penguin badge, bold 'Create your account',
+/// spacious 16px rounded inputs, 'I speak: English / বাংলা / Both' pills,
+/// privacy agreement checkbox, and full-width stadium 'Create account' CTA.
 class PingoSignupScreen extends ConsumerStatefulWidget {
   const PingoSignupScreen({super.key});
 
@@ -19,359 +25,544 @@ class PingoSignupScreen extends ConsumerStatefulWidget {
 }
 
 class _PingoSignupScreenState extends ConsumerState<PingoSignupScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+
   bool _obscurePassword = true;
-  String _selectedLang = 'English';
-  bool _agreed = true;
+  bool _agreedToPrivacy = true;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _nameFocus.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
   Future<void> _handleSignup() async {
+    ref.read(authProvider.notifier).clearError();
+    if (!_formKey.currentState!.validate()) {
+      HapticFeedback.lightImpact();
+      return;
+    }
+
+    if (!_agreedToPrivacy) {
+      HapticFeedback.lightImpact();
+      final isBangla = ref.read(pingoChatProvider).language == 'bn';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.inkSurface,
+          content: Text(
+            isBangla
+                ? 'অনুগ্রহ করে শর্তাবলী এবং গোপনীয়তা নীতিতে সম্মতি দিন'
+                : 'Please agree to the Terms and Privacy Policy to continue.',
+            style: const TextStyle(color: AppColors.paperWhite),
+          ),
+        ),
+      );
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    TextInput.finishAutofillContext();
+
+    final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an email and password')),
-      );
-      return;
-    }
-
-    if (!_agreed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please agree to the Terms and Privacy Policy')),
-      );
-      return;
-    }
+    ref.read(pingoChatProvider.notifier).setLanguage('en');
 
     final success = await ref.read(authProvider.notifier).register(
-      email: email,
-      password: password,
-    );
+          email: email,
+          password: password,
+          name: name.isEmpty ? null : name,
+        );
 
     if (success && mounted) {
-      PingoPermissionsScreen.open(context);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const PingoHomeScreen()),
+        (route) => false,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBg : AppColors.pingoBackground;
-    final cardBg = isDark ? AppColors.darkSurface : AppColors.pingoSurface;
-    final textColor = isDark ? Colors.white : AppColors.pingoDark;
-    final mutedColor = isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted;
     final authState = ref.watch(authProvider);
+    final isBangla =
+        ref.watch(pingoChatProvider.select((s) => s.language)) == 'bn';
 
     return Scaffold(
-      backgroundColor: bg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Back Button
-              Align(
-                alignment: Alignment.centerLeft,
-                child: InkWell(
-                  onTap: () => Navigator.of(context).pop(),
-                  borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isDark ? AppColors.darkBorder : const Color(0xFFE5E7EB),
-                        width: 1.2,
-                      ),
-                      color: isDark ? AppColors.darkSurface : Colors.white,
-                    ),
-                    child: Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 16,
-                      color: isDark ? Colors.white70 : const Color(0xFF374151),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              Text(
-                'Create your account',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: textColor,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'It takes less than a minute.',
-                style: TextStyle(fontSize: 15.5, color: mutedColor),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Error Banner if present
-              if (authState.errorMessage != null)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          authState.errorMessage!,
-                          style: const TextStyle(color: Colors.red, fontSize: 13.5),
+      backgroundColor: AppColors.inkBlack,
+      body: TechCanvasBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: AutofillGroup(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // ── Top Bar: Circular Back Button + Penguin Mascot Pill ──
+                        Row(
+                          children: [
+                            InkWell(
+                              onTap: () => Navigator.of(context).pop(),
+                              borderRadius: BorderRadius.circular(999),
+                              child: Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: AppColors.inkCard,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppColors.inkBorderActive,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.chevron_left_rounded,
+                                  size: 24,
+                                  color: AppColors.paperWhite,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.inkCard,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: AppColors.inkBorder,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.asset(
+                                      'assets/images/penguin_avatar.png',
+                                      width: 22,
+                                      height: 22,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Pingo',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.paperWhite,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
 
-              // Your name field
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
-                ),
-                child: TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    hintText: 'Your name',
-                    hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
+                        const SizedBox(height: 24),
 
-              const SizedBox(height: 14),
-
-              // Email field
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
-                ),
-                child: TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    hintText: 'Email address',
-                    hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // Password field
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
-                ),
-                child: TextField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    hintText: 'Password (min 8 chars)',
-                    hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
-                    border: InputBorder.none,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: mutedColor,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              Text(
-                'I speak',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              Row(
-                children: [
-                  _langChip('English'),
-                  const SizedBox(width: 10),
-                  _langChip('বাংলা'),
-                  const SizedBox(width: 10),
-                  _langChip('Both'),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // Checkbox terms
-              InkWell(
-                onTap: () => setState(() => _agreed = !_agreed),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 22,
-                      height: 22,
-                      margin: const EdgeInsets.only(top: 2),
-                      decoration: BoxDecoration(
-                        color: _agreed ? AppColors.pingoPurple : Colors.transparent,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: _agreed ? AppColors.pingoPurple : const Color(0xFF9CA3AF),
-                          width: 1.6,
-                        ),
-                      ),
-                      child: _agreed
-                          ? const Icon(Icons.check, color: Colors.white, size: 16)
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'I agree to the Terms and the Privacy Policy. My reminders and documents stay private.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: textColor,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Create account button
-              InkWell(
-                onTap: authState.isLoading ? null : _handleSignup,
-                borderRadius: BorderRadius.circular(26),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(26),
-                    color: AppColors.pingoPurple,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.pingoPurple.withValues(alpha: 0.35),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: authState.isLoading
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                        )
-                      : const Text(
-                          'Create account',
-                          style: TextStyle(
-                            fontSize: 16,
+                        // ── Headline & Subtitle (Matches '6. Sign up.png') ──
+                        Text(
+                          isBangla
+                              ? 'অ্যাকাউন্ট তৈরি করুন'
+                              : 'Create your account',
+                          style: const TextStyle(
+                            fontSize: 32,
                             fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                            color: AppColors.paperWhite,
+                            letterSpacing: -0.5,
+                            height: 1.2,
                           ),
                         ),
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // Already have an account? Log in
-              Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Already have an account? ', style: TextStyle(fontSize: 14.5, color: mutedColor)),
-                    InkWell(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: const Text(
-                        'Log in',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.pingoPurple,
+                        const SizedBox(height: 8),
+                        Text(
+                          isBangla
+                              ? 'এক মিনিটেরও কম সময় লাগবে।'
+                              : 'It takes less than a minute.',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.paperMuted,
+                            height: 1.4,
+                          ),
                         ),
-                      ),
+
+                        const SizedBox(height: 24),
+
+                        // ── Inline Error Banner ──
+                        if (authState.errorMessage != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.inkCard,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: AppColors.overdue,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppColors.overdue,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    authState.errorMessage!,
+                                    style: const TextStyle(
+                                      color: AppColors.paperWhite,
+                                      fontSize: 13,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // ── 1. Your Name Field (56dp rounded input) ──
+                        TextFormField(
+                          controller: _nameController,
+                          focusNode: _nameFocus,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.name],
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(context).requestFocus(_emailFocus);
+                          },
+                          style: const TextStyle(
+                            color: AppColors.paperWhite,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          decoration: _inputDecoration(
+                            hintText: isBangla ? 'আপনার নাম' : 'Your name',
+                            prefixIcon: Icons.person_outline_rounded,
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // ── 2. Email Field (56dp rounded input) ──
+                        TextFormField(
+                          controller: _emailController,
+                          focusNode: _emailFocus,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.email],
+                          onChanged: (_) =>
+                              ref.read(authProvider.notifier).clearError(),
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(context)
+                                .requestFocus(_passwordFocus);
+                          },
+                          style: const TextStyle(
+                            color: AppColors.paperWhite,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          decoration: _inputDecoration(
+                            hintText: isBangla
+                                ? 'ইমেইল ঠিকানা'
+                                : 'Email address',
+                            prefixIcon: Icons.mail_outline_rounded,
+                          ),
+                          validator: (value) {
+                            final v = (value ?? '').trim();
+                            if (v.isEmpty) {
+                              return isBangla
+                                  ? 'ইমেইল ঠিকানা আবশ্যক'
+                                  : 'Email address is required';
+                            }
+                            if (!v.contains('@') || !v.contains('.')) {
+                              return isBangla
+                                  ? 'সঠিক ইমেইল ঠিকানা লিখুন'
+                                  : 'Enter a valid email address';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // ── 3. Password Field (56dp rounded input) ──
+                        TextFormField(
+                          controller: _passwordController,
+                          focusNode: _passwordFocus,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.newPassword],
+                          onChanged: (_) =>
+                              ref.read(authProvider.notifier).clearError(),
+                          onFieldSubmitted: (_) => _handleSignup(),
+                          style: const TextStyle(
+                            color: AppColors.paperWhite,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          decoration: _inputDecoration(
+                            hintText: isBangla
+                                ? 'পাসওয়ার্ড (কমপক্ষে ৮ অক্ষর)'
+                                : 'Password (8+ characters)',
+                            prefixIcon: Icons.lock_outline_rounded,
+                            suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? (isBangla
+                                      ? 'পাসওয়ার্ড দেখুন'
+                                      : 'Show password')
+                                  : (isBangla
+                                      ? 'পাসওয়ার্ড লুকান'
+                                      : 'Hide password'),
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: AppColors.paperSubtle,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.length < 8) {
+                              return isBangla
+                                  ? 'পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে'
+                                  : 'Password must be at least 8 characters';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 22),
+
+                        // ── Terms & Privacy Checkbox Row (Matches '6. Sign up.png') ──
+                        InkWell(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _agreedToPrivacy = !_agreedToPrivacy;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 22,
+                                  height: 22,
+                                  margin: const EdgeInsets.only(top: 1),
+                                  decoration: BoxDecoration(
+                                    color: _agreedToPrivacy
+                                        ? AppColors.signalAmber
+                                        : AppColors.inkCard,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: _agreedToPrivacy
+                                          ? AppColors.signalAmber
+                                          : AppColors.inkBorderActive,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: _agreedToPrivacy
+                                      ? const Icon(
+                                          Icons.check_rounded,
+                                          size: 16,
+                                          color: AppColors.inkBlack,
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    isBangla
+                                        ? 'আমি শর্তাবলী এবং গোপনীয়তা নীতিতে সম্মত। আমার রিমাইন্ডার এবং ডকুমেন্ট সম্পূর্ণ গোপন থাকবে।'
+                                        : 'I agree to the Terms and the Privacy Policy. My reminders and documents stay private.',
+                                    style: const TextStyle(
+                                      fontSize: 13.5,
+                                      color: AppColors.paperMuted,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 36),
+
+                        // ── Primary Pill CTA: "Create account" (54dp stadium) ──
+                        SizedBox(
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed:
+                                authState.isLoading ? null : _handleSignup,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.paperWhite,
+                              foregroundColor: AppColors.inkBlack,
+                              disabledBackgroundColor: AppColors.inkSurface,
+                              disabledForegroundColor: AppColors.paperSubtle,
+                              elevation: 0,
+                              shape: const StadiumBorder(),
+                            ),
+                            child: authState.isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                      color: AppColors.inkBlack,
+                                    ),
+                                  )
+                                : Text(
+                                    isBangla
+                                        ? 'অ্যাকাউন্ট তৈরি করুন'
+                                        : 'Create account',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.inkBlack,
+                                    ),
+                                  ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // ── Bottom Link: "Already have an account? Log in" ──
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              isBangla
+                                  ? 'ইতিমধ্যে অ্যাকাউন্ট আছে? '
+                                  : 'Already have an account? ',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: AppColors.paperMuted,
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                ref.read(authProvider.notifier).clearError();
+                                Navigator.of(context).pop();
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 6,
+                                ),
+                                child: Text(
+                                  isBangla ? 'লগ ইন করুন' : 'Log in',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.signalAmber,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-
-              const SizedBox(height: 12),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _langChip(String label) {
-    final isSelected = _selectedLang == label;
-    return InkWell(
-      onTap: () => setState(() => _selectedLang = label),
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          color: isSelected ? AppColors.pingoPurple : Colors.white,
-          border: Border.all(
-            color: isSelected ? AppColors.pingoPurple : const Color(0xFFE5E7EB),
-            width: 1.2,
-          ),
+  InputDecoration _inputDecoration({
+    required String hintText,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      filled: true,
+      fillColor: AppColors.inkCard,
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: AppColors.paperSubtle,
+        fontSize: 15,
+        fontWeight: FontWeight.w400,
+      ),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 16, right: 12),
+        child: Icon(
+          prefixIcon,
+          size: 20,
+          color: AppColors.paperSubtle,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : const Color(0xFF374151),
-          ),
-        ),
+      ),
+      prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 20),
+      suffixIcon: suffixIcon,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.signalAmber, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.overdue, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.overdue, width: 1.5),
+      ),
+      errorStyle: const TextStyle(
+        color: AppColors.overdue,
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
       ),
     );
   }

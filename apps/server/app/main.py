@@ -1,7 +1,9 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import get_settings
@@ -14,14 +16,30 @@ from app.core.exceptions import (
 from app.core.middleware import setup_middlewares
 from app.api.v1.api import api_router
 from app.api.v1.endpoints.health import router as health_router
+from app.api.v1.endpoints.voice import router as voice_router
+from app.db.base import Base
+from app.db.session import engine
+import app.models  # noqa: F401 - ensure all SQLAlchemy models are registered
 from app.services.fcm_service import fcm_push_service
 from app.services.reminder_scheduler import reminder_scheduler
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_AUDIO_PATH = os.path.join(BASE_DIR, "static", "audio")
+os.makedirs(STATIC_AUDIO_PATH, exist_ok=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure newly added tables (reminders, documentations) exist in PostgreSQL
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        logger.warning("[Startup] Database schema check skipped/failed: %s", exc)
+
     # Startup: Initialize Firebase Admin SDK and start async background scheduler
     fcm_push_service.initialize()
     reminder_scheduler.start()
@@ -47,10 +65,14 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler) 
 # Middlewares
 setup_middlewares(app, settings)
 
+# Mount /static/audio for generated Edge-TTS MP3 responses
+app.mount("/static/audio", StaticFiles(directory=STATIC_AUDIO_PATH), name="static_audio")
+
 # Root level health for standard load balancers
 app.include_router(health_router)
 
-# Versioned API routes
+# Exact /api/voice-command route as well as versioned /api/v1 routes
+app.include_router(voice_router, prefix="/api")
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
@@ -61,12 +83,12 @@ async def root():
         "docs": "/docs",
         "health": "/health",
         "api_v1": settings.API_V1_PREFIX,
+        "voice_command": "/api/voice-command",
         "download": "/download",
     }
 
 
 # APK Web Distribution
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_HTML_PATH = os.path.join(BASE_DIR, "static", "download.html")
 PINGO_ICON_PATH = os.path.join(BASE_DIR, "static", "pingo_icon.png")
 APK_CANDIDATE_PATHS = [

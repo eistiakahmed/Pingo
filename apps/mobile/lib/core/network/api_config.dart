@@ -42,4 +42,19 @@ class ApiConfig {
   static String get syncPull => '$baseUrl$prefixV1/sync/pull';
   static String get registerDeviceToken => '$baseUrl$prefixV1/devices/register-token';
   static String get testPush => '$baseUrl$prefixV1/devices/test-push';
+  static String get voiceCommand => '$baseUrl/api/voice-command';
+
+  /// Resolves relative backend audio paths (e.g. '/static/audio/abc.mp3') to full URLs.
+  static String resolveMediaUrl(String urlOrPath) {
+    final trimmed = urlOrPath.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    final cleanBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final cleanPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    return '$cleanBase$cleanPath';
+  }
 }

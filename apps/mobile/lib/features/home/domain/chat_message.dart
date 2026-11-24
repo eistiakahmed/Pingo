@@ -1,12 +1,16 @@
 import 'dart:convert';
 
 /// Immutable model representing a single conversational interaction in Pingo's chat stream.
-/// Supports inline reminders, punctual alarm triggers, and encrypted document attachments.
+/// Supports WhatsApp-style AI voice replies (`audioUrl`), inline reminders,
+/// punctual alarm triggers (`isAlarmTriggeredAlert`), and encrypted document attachments.
 class ChatMessage {
   final String id;
   final String text;
   final bool isUser;
   final DateTime timestamp;
+  final String? audioUrl;
+  final bool isAlarmTriggeredAlert;
+
   final String? reminderId;
   final String? reminderTitle;
   final DateTime? reminderDueAt;
@@ -21,7 +25,7 @@ class ChatMessage {
   final String? filePath;
   final int? fileSize;
 
-  // Confirmation gate for zero false-alarm reminders
+  // Confirmation gate fields
   final bool isPendingConfirmation;
   final String? pendingReminderCategory;
   final String? pendingReminderPriority;
@@ -31,6 +35,8 @@ class ChatMessage {
     required this.text,
     required this.isUser,
     required this.timestamp,
+    this.audioUrl,
+    this.isAlarmTriggeredAlert = false,
     this.reminderId,
     this.reminderTitle,
     this.reminderDueAt,
@@ -47,6 +53,7 @@ class ChatMessage {
     this.pendingReminderPriority,
   });
 
+  bool get hasAudio => audioUrl != null && audioUrl!.trim().isNotEmpty;
   bool get hasReminder => reminderTitle != null && reminderDueAt != null;
   bool get hasPendingReminder => isPendingConfirmation && hasReminder;
   bool get hasDocument => documentTitle != null && documentTitle!.isNotEmpty;
@@ -56,6 +63,8 @@ class ChatMessage {
     String? text,
     bool? isUser,
     DateTime? timestamp,
+    String? audioUrl,
+    bool? isAlarmTriggeredAlert,
     String? reminderId,
     String? reminderTitle,
     DateTime? reminderDueAt,
@@ -77,9 +86,14 @@ class ChatMessage {
       text: text ?? this.text,
       isUser: isUser ?? this.isUser,
       timestamp: timestamp ?? this.timestamp,
+      audioUrl: audioUrl ?? this.audioUrl,
+      isAlarmTriggeredAlert:
+          isAlarmTriggeredAlert ?? this.isAlarmTriggeredAlert,
       reminderId: clearReminder ? null : (reminderId ?? this.reminderId),
-      reminderTitle: clearReminder ? null : (reminderTitle ?? this.reminderTitle),
-      reminderDueAt: clearReminder ? null : (reminderDueAt ?? this.reminderDueAt),
+      reminderTitle:
+          clearReminder ? null : (reminderTitle ?? this.reminderTitle),
+      reminderDueAt:
+          clearReminder ? null : (reminderDueAt ?? this.reminderDueAt),
       isDone: isDone ?? this.isDone,
       suggestedActions: suggestedActions ?? this.suggestedActions,
       documentTitle: documentTitle ?? this.documentTitle,
@@ -88,7 +102,8 @@ class ChatMessage {
       documentIdentifier: documentIdentifier ?? this.documentIdentifier,
       filePath: filePath ?? this.filePath,
       fileSize: fileSize ?? this.fileSize,
-      isPendingConfirmation: isPendingConfirmation ?? this.isPendingConfirmation,
+      isPendingConfirmation:
+          isPendingConfirmation ?? this.isPendingConfirmation,
       pendingReminderCategory: clearReminder
           ? null
           : (pendingReminderCategory ?? this.pendingReminderCategory),
@@ -104,6 +119,8 @@ class ChatMessage {
       'text': text,
       'isUser': isUser,
       'timestamp': timestamp.toIso8601String(),
+      'audioUrl': audioUrl,
+      'isAlarmTriggeredAlert': isAlarmTriggeredAlert,
       'reminderId': reminderId,
       'reminderTitle': reminderTitle,
       'reminderDueAt': reminderDueAt?.toIso8601String(),
@@ -126,7 +143,10 @@ class ChatMessage {
       id: map['id'] as String,
       text: map['text'] as String,
       isUser: map['isUser'] as bool? ?? false,
-      timestamp: DateTime.tryParse(map['timestamp'] as String? ?? '') ?? DateTime.now(),
+      timestamp: DateTime.tryParse(map['timestamp'] as String? ?? '') ??
+          DateTime.now(),
+      audioUrl: map['audioUrl'] as String?,
+      isAlarmTriggeredAlert: map['isAlarmTriggeredAlert'] as bool? ?? false,
       reminderId: map['reminderId'] as String?,
       reminderTitle: map['reminderTitle'] as String?,
       reminderDueAt: map['reminderDueAt'] != null

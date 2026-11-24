@@ -11,6 +11,8 @@ class LocalStorageService {
 
   static const String _keyReminders = 'pingo_cached_reminders_v1';
   static const String _keyAuthToken = 'pingo_auth_jwt_token';
+  static const String _keyUserEmail = 'pingo_auth_user_email';
+  static const String _keyUserName = 'pingo_auth_user_name';
   static const String _keyDeviceId = 'pingo_unique_device_id';
 
   /// Saves active reminders to local disk storage, automatically pruning
@@ -79,6 +81,51 @@ class LocalStorageService {
       await prefs.setString(_keyAuthToken, token);
     } catch (e) {
       debugPrint('[LocalStorage] Error saving auth token: $e');
+    }
+  }
+
+  /// Saves the signed-in user's email and optional display name.
+  Future<void> saveUserAccount({required String email, String? name}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyUserEmail, email);
+      if (name != null && name.trim().isNotEmpty) {
+        await prefs.setString(_keyUserName, name.trim());
+      }
+    } catch (e) {
+      debugPrint('[LocalStorage] Error saving user account: $e');
+    }
+  }
+
+  /// Gets the signed-in user's email, if an explicit account is logged in.
+  Future<String?> getUserEmail() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_keyUserEmail);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Gets the signed-in user's display name, if saved.
+  Future<String?> getUserName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_keyUserName);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Clears the explicit user session (token, email, and name).
+  Future<void> clearAuthSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyAuthToken);
+      await prefs.remove(_keyUserEmail);
+      await prefs.remove(_keyUserName);
+    } catch (e) {
+      debugPrint('[LocalStorage] Error clearing auth session: $e');
     }
   }
 

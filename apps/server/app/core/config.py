@@ -1,7 +1,10 @@
 from functools import lru_cache
 from typing import List, Union
+from dotenv import load_dotenv
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -56,6 +59,10 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = Field(
         default="",
         description="Google Gemini API key for natural language processing",
+    )
+    GROQ_API_KEY: str = Field(
+        default="",
+        description="Groq API key for Whisper large-v3 Speech-to-Text",
     )
 
     # Security

@@ -121,6 +121,19 @@ class HomeReminderNotifier extends StateNotifier<HomeReminderState> {
     }
   }
 
+  /// Triggered immediately after a user signs in or registers an explicit account.
+  Future<void> syncWithAuthenticatedAccount() async {
+    final ref = _ref;
+    if (ref == null) return;
+    try {
+      final syncApi = ref.read(syncApiServiceProvider);
+      await pushToServer(syncApi);
+      await pullFromServer(syncApi);
+    } catch (e) {
+      debugPrint('[HomeReminderNotifier] Post-auth sync warning: $e');
+    }
+  }
+
   void _scheduleActiveFutureAlarms(List<ReminderItem> items) {
     final now = DateTime.now();
     for (final item in items) {

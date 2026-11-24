@@ -7,7 +7,14 @@ from alembic import context
 from app.core.config import get_settings
 from app.db.base import Base
 # Import all models to ensure they are registered with Base.metadata
-from app.models import User, EncryptedReminder, EncryptedVaultItem
+from app.models import (
+    User,
+    EncryptedReminder,
+    EncryptedVaultItem,
+    DeviceToken,
+    Reminder,
+    Documentation,
+)
 
 config = context.config
 

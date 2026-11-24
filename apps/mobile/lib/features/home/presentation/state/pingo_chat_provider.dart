@@ -1,10 +1,16 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/network/providers.dart';
+import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/voice_audio_player_service.dart';
+import '../../../../core/storage/local_storage_service.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import '../../../action_stream/domain/ai_models.dart';
+import '../../../auth/presentation/state/auth_provider.dart';
+import '../../../voice_capture/data/voice_command_api_service.dart';
 import '../../../../core/services/voice_recognition_service.dart';
 import '../../domain/chat_message.dart';
 import '../../domain/reminder_item.dart';
@@ -20,7 +26,7 @@ class PingoChatState {
   const PingoChatState({
     this.messages = const [],
     this.isThinking = false,
-    this.language = 'bn',
+    this.language = 'en',
     required this.sessionId,
   });
 
@@ -41,6 +47,8 @@ class PingoChatState {
 
 class PingoChatNotifier extends StateNotifier<PingoChatState> {
   final Ref _ref;
+  StreamSubscription<TriggeredAlarmEvent>? _alarmSub;
+  final Set<int> _shownTriggerIds = {};
 
   PingoChatNotifier(this._ref)
       : super(PingoChatState(sessionId: const Uuid().v4())) {
@@ -48,6 +56,65 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
     // Saved reminders live in HomeReminderNotifier + local storage and are untouched.
     ChatArchiveService.instance.clearActiveMessages();
     _loadDeviceTimezone();
+    _listenForTriggeredAlarms();
+  }
+
+  void _listenForTriggeredAlarms() {
+    _alarmSub = NotificationService.instance.onAlarmTriggered.listen((event) {
+      if (_shownTriggerIds.contains(event.id)) return;
+      _shownTriggerIds.add(event.id);
+
+      final timeStr = DateFormat.jm().format(event.scheduledDate);
+      final alertBubble = ChatMessage(
+        id: const Uuid().v4(),
+        text: 'Reminder due now ($timeStr): ${event.title}',
+        isUser: false,
+        timestamp: DateTime.now(),
+        isAlarmTriggeredAlert: true,
+        reminderTitle: event.title,
+        reminderDueAt: event.scheduledDate,
+      );
+      _appendBotMessage(alertBubble);
+    });
+  }
+
+  /// Checks if any active reminder reached its scheduled time while the app was backgrounded/closed,
+  /// and inserts its reminder bubble into the chat stream on resume.
+  void reconcileTriggeredRemindersOnResume() {
+    final now = DateTime.now();
+    final dueItems = _ref
+        .read(homeReminderProvider)
+        .reminders
+        .where((r) => !r.isDone && !r.dueAt.isAfter(now))
+        .toList();
+
+    for (final item in dueItems) {
+      final safeId = item.id.hashCode.abs() % 2147483647;
+      if (_shownTriggerIds.contains(safeId)) continue;
+      // Only surface recently triggered reminders (within the last 2 hours)
+      if (now.difference(item.dueAt).inHours <= 2) {
+        _shownTriggerIds.add(safeId);
+        final timeStr = DateFormat.jm().format(item.dueAt);
+        _appendBotMessage(
+          ChatMessage(
+            id: const Uuid().v4(),
+            text: 'Reminder due ($timeStr): ${item.title}',
+            isUser: false,
+            timestamp: DateTime.now(),
+            isAlarmTriggeredAlert: true,
+            reminderId: item.id,
+            reminderTitle: item.title,
+            reminderDueAt: item.dueAt,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _alarmSub?.cancel();
+    super.dispose();
   }
 
   /// Device IANA timezone (e.g. 'Asia/Dhaka') sent with every parse request
@@ -70,10 +137,119 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
     state = state.copyWith(language: lang);
   }
 
-  /// Suspends ongoing voice capture and resets background timers to prevent battery drain and notification loops.
+  ///Suspends ongoing voice capture and audio playback when backgrounded.
   void suspendServices() {
-    debugPrint('[PingoChat] Suspending voice and background services...');
+    debugPrint('[PingoChat] Suspending voice and audio playback services...');
     VoiceRecognitionService.instance.cancelListening();
+    VoiceAudioPlayerService.instance.stop();
+  }
+
+  /// Uploads a recorded `.m4a` voice note to `POST /api/voice-command`,
+  /// appends `user_said` (right) + `ai_reply` with Play/Pause voice note bar (left),
+  /// auto-plays `$baseUrl$audioUrl` via `just_audio`, and schedules exact local alarms
+  /// for every `set_reminder` tool action.
+  Future<void> sendVoiceCommandFile(String m4aPath) async {
+    state = state.copyWith(isThinking: true);
+
+    try {
+      final authState = _ref.read(authProvider);
+      final userId = (authState.userEmail != null &&
+              authState.userEmail!.trim().isNotEmpty)
+          ? authState.userEmail!.trim()
+          : await LocalStorageService.instance.getOrCreateDeviceId();
+
+      final result = await VoiceCommandApiService.instance.uploadVoiceCommand(
+        filePath: m4aPath,
+        userId: userId,
+      );
+
+      // 1. User message bubble on the right (`user_said`)
+      final userBubble = ChatMessage(
+        id: const Uuid().v4(),
+        text: result.userSaid.isNotEmpty ? result.userSaid : '🎤 Voice message',
+        isUser: true,
+        timestamp: DateTime.now(),
+      );
+
+      // 2. Inspect `actions` array for `set_reminder` and `save_documentation`
+      String? scheduledReminderId;
+      String? scheduledTitle;
+      DateTime? scheduledDueAt;
+      String? savedDocTitle;
+
+      for (final action in result.actions) {
+        if (action.tool == 'set_reminder') {
+          final rawTitle =
+              (action.arguments['task_title']?.toString() ?? 'Reminder').trim();
+          final rawTime =
+              (action.arguments['reminder_time']?.toString() ?? '').trim();
+          final parsedDue = DateTime.tryParse(rawTime)?.toLocal() ??
+              DateTime.now().add(const Duration(hours: 1));
+
+          final remId = action.recordId ?? const Uuid().v4();
+          final item = ReminderItem(
+            id: remId,
+            title: rawTitle.isNotEmpty ? rawTitle : 'Reminder',
+            dueAt: parsedDue,
+            category: _mapAiCategory(rawTitle),
+            priority: ReminderPriority.important,
+          );
+
+          // Persist & schedule exact alarm (`zonedSchedule` with `exactAllowWhileIdle`, sound & vibration)
+          _ref.read(homeReminderProvider.notifier).addReminder(item);
+
+          scheduledReminderId = remId;
+          scheduledTitle = item.title;
+          scheduledDueAt = parsedDue;
+        } else if (action.tool == 'save_documentation') {
+          savedDocTitle =
+              (action.arguments['title']?.toString() ?? 'Project Note').trim();
+        }
+      }
+
+      // 3. AI reply bubble on the left (`ai_reply` + `$baseUrl$audioUrl`)
+      final aiMsgId = const Uuid().v4();
+      final resolvedAudioUrl = result.fullAudioUrl;
+
+      final aiBubble = ChatMessage(
+        id: aiMsgId,
+        text: result.aiReply,
+        isUser: false,
+        timestamp: DateTime.now(),
+        audioUrl: resolvedAudioUrl.isNotEmpty ? resolvedAudioUrl : null,
+        reminderId: scheduledReminderId,
+        reminderTitle: scheduledTitle,
+        reminderDueAt: scheduledDueAt,
+        isPendingConfirmation: false,
+        documentTitle: savedDocTitle,
+        documentCategory: savedDocTitle != null ? 'Documentation' : null,
+      );
+
+      state = state.copyWith(
+        messages: [...state.messages, userBubble, aiBubble],
+        isThinking: false,
+      );
+
+      // 4. Auto-play `$baseUrl$audioUrl` immediately via `just_audio`
+      if (resolvedAudioUrl.isNotEmpty) {
+        await VoiceAudioPlayerService.instance.playUrl(
+          messageId: aiMsgId,
+          audioUrl: resolvedAudioUrl,
+        );
+      }
+    } catch (e) {
+      debugPrint('[PingoChat] Voice command error: $e');
+      final errBubble = ChatMessage(
+        id: const Uuid().v4(),
+        text: 'Could not process voice note right now. Please check your connection and try again.',
+        isUser: false,
+        timestamp: DateTime.now(),
+      );
+      state = state.copyWith(
+        messages: [...state.messages, errBubble],
+        isThinking: false,
+      );
+    }
   }
 
   /// 'New chat' menu action: clears the on-screen conversation.
@@ -193,19 +369,20 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
     state = state.copyWith(messages: updatedList);
   }
 
-  /// Discards a proposed reminder without scheduling any alarm.
+  /// Undoes an auto-saved reminder (or discards a pending one) and cancels its system alarm.
   Future<void> discardReminder(String messageId) async {
-    final isBangla = state.language == 'bn';
     final index = state.messages.indexWhere((m) => m.id == messageId);
     if (index == -1) return;
 
     final targetMsg = state.messages[index];
+    if (targetMsg.reminderId != null) {
+      _ref.read(homeReminderProvider.notifier).deleteReminder(targetMsg.reminderId!);
+    }
+
     final updatedMsg = targetMsg.copyWith(
       isPendingConfirmation: false,
       clearReminder: true,
-      text: isBangla
-          ? 'প্রস্তাবিত রিমাইন্ডারটি বাতিল করা হয়েছে'
-          : 'Proposed reminder discarded',
+      text: 'Reminder removed',
       suggestedActions: const [],
     );
 
@@ -267,27 +444,37 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
       }
 
       // chat intent → local canned responses (AI never writes free-form replies)
-      _appendBotMessage(_botMsg(_generateConversationalResponse(lower, isBangla)));
+      _appendBotMessage(_botMsg(_generateConversationalResponse(lower, false)));
     } catch (e) {
-      // Fallback: local heuristic parse with mandatory confirmation gate
+      // Fallback: local heuristic parse auto-saved immediately with Undo support
       final fallbackDue = _heuristicDueAt(trimmed);
+      final reminderId = const Uuid().v4();
+      final reminderItem = ReminderItem(
+        id: reminderId,
+        title: trimmed,
+        dueAt: fallbackDue,
+        category: ReminderCategory.personal,
+        priority: ReminderPriority.normal,
+      );
+      _ref.read(homeReminderProvider.notifier).addReminder(reminderItem);
 
       final replyMsg = ChatMessage(
         id: const Uuid().v4(),
         text: '',
         isUser: false,
         timestamp: DateTime.now(),
+        reminderId: reminderId,
         reminderTitle: trimmed,
         reminderDueAt: fallbackDue,
-        isPendingConfirmation: true,
+        isPendingConfirmation: false,
         pendingReminderCategory: 'personal',
       );
       _appendBotMessage(replyMsg);
     }
   }
 
-  /// create_reminder: a clarifying question always wins over a guess, and the
-  /// compact pending bubble requires explicit ✓ before any alarm is scheduled.
+  /// create_reminder: auto-saves and schedules immediately (no manual confirmation gate),
+  /// while exposing a 1-tap Undo action on the confirmed card.
   Future<void> _handleCreateIntent(
       String userText, ParsedReminderData parsed, bool isBangla) async {
     if (parsed.needsClarification) {
@@ -297,18 +484,32 @@ class PingoChatNotifier extends StateNotifier<PingoChatState> {
 
     final effectiveTitle = parsed.title.trim().isNotEmpty
         ? parsed.title.trim()
-        : (isBangla ? 'রিমাইন্ডার' : 'Reminder');
+        : 'Reminder';
     final effectiveDueAt = parsed.dueAt?.toLocal() ?? _heuristicDueAt(userText);
+    final reminderId = const Uuid().v4();
+
+    final reminderItem = ReminderItem(
+      id: reminderId,
+      title: effectiveTitle,
+      dueAt: effectiveDueAt,
+      category: _mapAiCategory(parsed.category),
+      priority: parsed.priority == 'HIGH' || parsed.priority == 'URGENT'
+          ? ReminderPriority.important
+          : ReminderPriority.normal,
+    );
+
+    // Auto-save & schedule exact alarm immediately
+    _ref.read(homeReminderProvider.notifier).addReminder(reminderItem);
 
     _appendBotMessage(ChatMessage(
       id: const Uuid().v4(),
-      // Compact pending confirmation bubble — no alarm until ✓
       text: '',
       isUser: false,
       timestamp: DateTime.now(),
+      reminderId: reminderId,
       reminderTitle: effectiveTitle,
       reminderDueAt: effectiveDueAt,
-      isPendingConfirmation: true,
+      isPendingConfirmation: false,
       pendingReminderCategory: parsed.category,
       pendingReminderPriority: parsed.priority,
     ));

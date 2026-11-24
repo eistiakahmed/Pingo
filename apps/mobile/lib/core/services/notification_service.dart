@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -7,6 +8,19 @@ import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+
+/// Event emitted when a scheduled reminder triggers so the Chat UI can append an inline alert bubble.
+class TriggeredAlarmEvent {
+  final int id;
+  final String title;
+  final DateTime scheduledDate;
+
+  const TriggeredAlarmEvent({
+    required this.id,
+    required this.title,
+    required this.scheduledDate,
+  });
+}
 
 /// Production-grade Local Notification & Alarm Service for Pingo.
 /// Provides offline-first, zero-knowledge punctual alerts via Android AlarmManager.
@@ -21,6 +35,29 @@ class NotificationService {
   Future<void>? _initFuture;
   Future<bool>? _permissionFuture;
   final Map<int, Timer> _activeTimers = {};
+  final Set<int> _emittedAlarmIds = {};
+  final StreamController<TriggeredAlarmEvent> _alarmTriggeredController =
+      StreamController<TriggeredAlarmEvent>.broadcast();
+
+  /// Broadcast stream emitting whenever a scheduled reminder triggers or is tapped.
+  Stream<TriggeredAlarmEvent> get onAlarmTriggered =>
+      _alarmTriggeredController.stream;
+
+  void _emitAlarmTriggered({
+    required int safeId,
+    required String title,
+    required DateTime scheduledDate,
+  }) {
+    if (_emittedAlarmIds.contains(safeId)) return;
+    _emittedAlarmIds.add(safeId);
+    _alarmTriggeredController.add(
+      TriggeredAlarmEvent(
+        id: safeId,
+        title: title,
+        scheduledDate: scheduledDate,
+      ),
+    );
+  }
 
   static const String _defaultChannelId = 'pingo_reminders_channel_v3';
   static const String _defaultChannelName = 'Pingo Reminders';
@@ -84,6 +121,23 @@ class NotificationService {
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           debugPrint(
               '[NotificationService] Notification tapped: ${response.payload}');
+          final rawPayload = response.payload;
+          if (rawPayload != null && rawPayload.startsWith('{')) {
+            try {
+              final map = jsonDecode(rawPayload) as Map<String, dynamic>;
+              final safeId = (map['id'] as num?)?.toInt() ?? 0;
+              final title = (map['title'] as String?) ?? 'Reminder';
+              final due = DateTime.tryParse(map['dueAt'] as String? ?? '') ??
+                  DateTime.now();
+              if (safeId != 0) {
+                _emitAlarmTriggered(
+                  safeId: safeId,
+                  title: title,
+                  scheduledDate: due,
+                );
+              }
+            } catch (_) {}
+          }
         },
       );
 
@@ -263,9 +317,16 @@ class NotificationService {
         targetTz = tzNow.add(const Duration(seconds: 5));
       }
 
+      final payloadJson = jsonEncode({
+        'id': safeId,
+        'title': title,
+        'dueAt': localDate.toIso8601String(),
+      });
+      _emittedAlarmIds.remove(safeId);
+
       // Layer 1: In-process exact Dart Timer fallback.
       // Guarantees punctual delivery with sound while the app process is alive
-      // in foreground or background memory, even on aggressive OEM battery savers.
+      // in foreground or background memory, and emits an inline chat trigger bubble.
       _activeTimers[safeId]?.cancel();
       final Duration delay = targetTz.difference(tzNow);
       _activeTimers[safeId] = Timer(delay, () async {
@@ -277,7 +338,12 @@ class NotificationService {
             title,
             displayBody,
             notificationDetails,
-            payload: 'reminder_$safeId',
+            payload: payloadJson,
+          );
+          _emitAlarmTriggered(
+            safeId: safeId,
+            title: title,
+            scheduledDate: localDate,
           );
           debugPrint(
               '[NotificationService] Fired in-app timer notification #$safeId: "$title"');
@@ -287,28 +353,7 @@ class NotificationService {
         }
       });
 
-      // Layer 2: Native system AlarmClock (wakes device when app is closed/killed)
-      try {
-        await _notificationsPlugin.zonedSchedule(
-          safeId,
-          title,
-          displayBody,
-          targetTz,
-          notificationDetails,
-          androidScheduleMode: AndroidScheduleMode.alarmClock,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          payload: 'reminder_$safeId',
-        );
-        debugPrint(
-            '[NotificationService] Scheduled reminder #$safeId as native AlarmClock for $targetTz');
-        return;
-      } catch (alarmClockErr) {
-        debugPrint(
-            '[NotificationService] AlarmClock mode failed ($alarmClockErr). Trying exactAllowWhileIdle...');
-      }
-
-      // Priority 2: exactAllowWhileIdle at the exact targetTz
+      // Layer 2: Native zonedSchedule with exactAllowWhileIdle (wakes closed/offline device at exact time)
       try {
         await _notificationsPlugin.zonedSchedule(
           safeId,
@@ -319,17 +364,32 @@ class NotificationService {
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
-          payload: 'reminder_$safeId',
+          payload: payloadJson,
         );
         debugPrint(
             '[NotificationService] Scheduled reminder #$safeId with exactAllowWhileIdle for $targetTz');
         return;
       } catch (exactErr) {
         debugPrint(
-            '[NotificationService] exactAllowWhileIdle failed ($exactErr). Falling back to inexactAllowWhileIdle at targetTz...');
+            '[NotificationService] exactAllowWhileIdle failed ($exactErr). Trying alarmClock / inexact fallback...');
       }
 
-      // Priority 3: inexactAllowWhileIdle at targetTz (NEVER 15s from now!)
+      // Fallback Layer: alarmClock -> inexactAllowWhileIdle at exact targetTz
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          safeId,
+          title,
+          displayBody,
+          targetTz,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.alarmClock,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: payloadJson,
+        );
+        return;
+      } catch (_) {}
+
       await _notificationsPlugin.zonedSchedule(
         safeId,
         title,
@@ -339,7 +399,7 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
-        payload: 'reminder_$safeId',
+        payload: payloadJson,
       );
       debugPrint(
           '[NotificationService] Scheduled reminder #$safeId with inexactAllowWhileIdle for $targetTz');

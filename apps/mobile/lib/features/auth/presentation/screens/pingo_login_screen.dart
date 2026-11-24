@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pingo_mobile/core/theme/app_colors.dart';
 import 'package:pingo_mobile/features/auth/presentation/screens/pingo_signup_screen.dart';
 import 'package:pingo_mobile/features/auth/presentation/state/auth_provider.dart';
 import 'package:pingo_mobile/features/home/presentation/screens/pingo_home_screen.dart';
+import 'package:pingo_mobile/features/home/presentation/state/pingo_chat_provider.dart';
+import 'package:pingo_mobile/features/home/presentation/widgets/tech_canvas_background.dart';
 
-/// Screen implementing '5. Log in.png' connected to Pingo API.
+/// Pingo Login Screen — Faithful Dark-Theme Adaptation of '5. Log in.png'
+/// featuring the Headphone Penguin Mascot badge, spacious rounded inputs (16px),
+/// full-width stadium pill buttons, 'Continue with Google', and 'Continue without an account'.
 class PingoLoginScreen extends ConsumerStatefulWidget {
   const PingoLoginScreen({super.key});
 
@@ -14,309 +19,540 @@ class PingoLoginScreen extends ConsumerStatefulWidget {
 }
 
 class _PingoLoginScreenState extends ConsumerState<PingoLoginScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter email and password')),
-      );
+    ref.read(authProvider.notifier).clearError();
+    if (!_formKey.currentState!.validate()) {
+      HapticFeedback.lightImpact();
       return;
     }
 
+    HapticFeedback.mediumImpact();
+    TextInput.finishAutofillContext();
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
     final success = await ref.read(authProvider.notifier).login(
-      email: email,
-      password: password,
-    );
+          email: email,
+          password: password,
+        );
 
     if (success && mounted) {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const PingoHomeScreen()),
+        (route) => false,
       );
     }
   }
 
+  void _handleGoogleSignIn(bool isBangla) {
+    HapticFeedback.selectionClick();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.inkSurface,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.inkBorder, width: 1),
+        ),
+        content: Text(
+          isBangla
+              ? 'ইমেইল ও পাসওয়ার্ড দিয়ে লগ ইন করুন অথবা নিচে অতিথি হিসেবে চালিয়ে যান'
+              : 'Use email & password above, or continue without an account below.',
+          style: const TextStyle(color: AppColors.paperWhite, fontSize: 13),
+        ),
+      ),
+    );
+  }
+
+  void _handleContinueAsGuest() {
+    HapticFeedback.selectionClick();
+    ref.read(authProvider.notifier).continueAsGuest();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const PingoHomeScreen()),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBg : AppColors.pingoBackground;
-    final cardBg = isDark ? AppColors.darkSurface : AppColors.pingoSurface;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.pingoBorder;
-    final textColor = isDark ? Colors.white : AppColors.pingoDark;
-    final mutedColor = isDark ? AppColors.darkTextSecondary : AppColors.pingoMuted;
     final authState = ref.watch(authProvider);
+    final isBangla =
+        ref.watch(pingoChatProvider.select((s) => s.language)) == 'bn';
 
     return Scaffold(
-      backgroundColor: bg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 24),
-
-              // Bell Logo Icon in rounded square
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: AppColors.pingoPurple,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.pingoPurple.withValues(alpha: 0.3),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.notifications_rounded, color: Colors.white, size: 30),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Title & Subtitle
-              Text(
-                'Welcome back',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: textColor,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Log in to see your reminders on any phone.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: mutedColor,
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Error Banner if present
-              if (authState.errorMessage != null)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          authState.errorMessage!,
-                          style: const TextStyle(color: Colors.red, fontSize: 13.5),
+      backgroundColor: AppColors.inkBlack,
+      body: TechCanvasBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: AutofillGroup(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // ── Top Row: 64x64 Penguin Hero Badge ──
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFADEAFF),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppColors.inkBorderActive,
+                                  width: 1.5,
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Image.asset(
+                                'assets/images/penguin_avatar.png',
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.high,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
 
-              // Email input field
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
-                ),
-                child: TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    hintText: 'Email address',
-                    hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
+                        const SizedBox(height: 28),
 
-              const SizedBox(height: 14),
-
-              // Password input field
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
-                ),
-                child: TextField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    hintText: 'Password',
-                    hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
-                    border: InputBorder.none,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: mutedColor,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Continue Button
-              InkWell(
-                onTap: authState.isLoading ? null : _handleLogin,
-                borderRadius: BorderRadius.circular(26),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(26),
-                    color: AppColors.pingoPurple,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.pingoPurple.withValues(alpha: 0.35),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: authState.isLoading
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                        )
-                      : const Text(
-                          'Continue',
-                          style: TextStyle(
-                            fontSize: 16,
+                        // ── Bold Headline & Subtitle (Matches '5. Log in.png') ──
+                        Text(
+                          isBangla ? 'আবার স্বাগতম' : 'Welcome back',
+                          style: const TextStyle(
+                            fontSize: 32,
                             fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                            color: AppColors.paperWhite,
+                            letterSpacing: -0.5,
+                            height: 1.2,
                           ),
                         ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // 'or' Divider
-              Row(
-                children: [
-                  Expanded(child: Divider(color: borderColor)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Text('or', style: TextStyle(color: mutedColor, fontSize: 13)),
-                  ),
-                  Expanded(child: Divider(color: borderColor)),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // Continue with Google Button
-              InkWell(
-                onTap: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const PingoHomeScreen()),
-                  );
-                },
-                borderRadius: BorderRadius.circular(26),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
-                    color: cardBg,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Continue with Google',
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 36),
-
-              // New to Pingo? Sign up
-              Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('New to Pingo? ', style: TextStyle(fontSize: 14.5, color: mutedColor)),
-                    InkWell(
-                      onTap: () => PingoSignupScreen.open(context),
-                      child: const Text(
-                        'Sign up',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.pingoPurple,
+                        const SizedBox(height: 8),
+                        Text(
+                          isBangla
+                              ? 'যেকোনো ফোনে আপনার রিমাইন্ডার দেখতে লগ ইন করুন।'
+                              : 'Log in to see your reminders on any phone.',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.paperMuted,
+                            height: 1.4,
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(height: 14),
+                        const SizedBox(height: 28),
 
-              // Continue without an account
-              Center(
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => const PingoHomeScreen()),
-                    );
-                  },
-                  child: Text(
-                    'Continue without an account',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: mutedColor,
+                        // ── Inline Error Banner ──
+                        if (authState.errorMessage != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.inkCard,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: AppColors.overdue,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppColors.overdue,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    authState.errorMessage!,
+                                    style: const TextStyle(
+                                      color: AppColors.paperWhite,
+                                      fontSize: 13,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // ── Email Field (56dp spacious rounded input) ──
+                        TextFormField(
+                          controller: _emailController,
+                          focusNode: _emailFocus,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.email],
+                          onChanged: (_) =>
+                              ref.read(authProvider.notifier).clearError(),
+                          onFieldSubmitted: (_) {
+                            FocusScope.of(context)
+                                .requestFocus(_passwordFocus);
+                          },
+                          style: const TextStyle(
+                            color: AppColors.paperWhite,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          decoration: _inputDecoration(
+                            hintText: isBangla
+                                ? 'ইমেইল ঠিকানা'
+                                : 'Email address',
+                            prefixIcon: Icons.mail_outline_rounded,
+                          ),
+                          validator: (value) {
+                            final v = (value ?? '').trim();
+                            if (v.isEmpty) {
+                              return isBangla
+                                  ? 'ইমেইল ঠিকানা লিখুন'
+                                  : 'Enter your email address';
+                            }
+                            if (!v.contains('@') || !v.contains('.')) {
+                              return isBangla
+                                  ? 'সঠিক ইমেইল ঠিকানা লিখুন'
+                                  : 'Enter a valid email address';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // ── Password Field (56dp spacious rounded input) ──
+                        TextFormField(
+                          controller: _passwordController,
+                          focusNode: _passwordFocus,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.password],
+                          onChanged: (_) =>
+                              ref.read(authProvider.notifier).clearError(),
+                          onFieldSubmitted: (_) => _handleLogin(),
+                          style: const TextStyle(
+                            color: AppColors.paperWhite,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          decoration: _inputDecoration(
+                            hintText: isBangla ? 'পাসওয়ার্ড' : 'Password',
+                            prefixIcon: Icons.lock_outline_rounded,
+                            suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? (isBangla
+                                      ? 'পাসওয়ার্ড দেখুন'
+                                      : 'Show password')
+                                  : (isBangla
+                                      ? 'পাসওয়ার্ড লুকান'
+                                      : 'Hide password'),
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: AppColors.paperSubtle,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return isBangla
+                                  ? 'পাসওয়ার্ড লিখুন'
+                                  : 'Enter your password';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Helper Caption (Matches '5. Log in.png')
+                        Text(
+                          isBangla
+                              ? 'আপনার রিমাইন্ডার ও ভল্ট এন্ড-টু-এন্ড সুরক্ষিত থাকবে।'
+                              : 'Your reminders and vault stay synced and private.',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.paperSubtle,
+                            height: 1.4,
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // ── Primary Pill CTA: "Continue" (54dp height, stadium shape) ──
+                        SizedBox(
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed:
+                                authState.isLoading ? null : _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.paperWhite,
+                              foregroundColor: AppColors.inkBlack,
+                              disabledBackgroundColor: AppColors.inkSurface,
+                              disabledForegroundColor: AppColors.paperSubtle,
+                              elevation: 0,
+                              shape: const StadiumBorder(),
+                            ),
+                            child: authState.isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                      color: AppColors.inkBlack,
+                                    ),
+                                  )
+                                : Text(
+                                    isBangla ? 'এগিয়ে যান' : 'Continue',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.inkBlack,
+                                    ),
+                                  ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 22),
+
+                        // ── "or" Divider Row (Matches '5. Log in.png') ──
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Divider(
+                                color: AppColors.inkBorder,
+                                thickness: 1,
+                              ),
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                isBangla ? 'অথবা' : 'or',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.paperSubtle,
+                                ),
+                              ),
+                            ),
+                            const Expanded(
+                              child: Divider(
+                                color: AppColors.inkBorder,
+                                thickness: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 22),
+
+                        // ── Secondary Pill Button: "Continue with Google" ──
+                        SizedBox(
+                          height: 54,
+                          child: OutlinedButton(
+                            onPressed: () => _handleGoogleSignIn(isBangla),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: AppColors.inkCard,
+                              side: const BorderSide(
+                                color: AppColors.inkBorderActive,
+                                width: 1,
+                              ),
+                              shape: const StadiumBorder(),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 22,
+                                  height: 22,
+                                  alignment: Alignment.center,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.paperWhite,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Text(
+                                    'G',
+                                    style: TextStyle(
+                                      color: AppColors.inkBlack,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  isBangla
+                                      ? 'Google দিয়ে চালিয়ে যান'
+                                      : 'Continue with Google',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.paperWhite,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 44),
+
+                        // ── Bottom Links: "New to Pingo? Sign up" ──
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              isBangla ? 'পিঙ্গোতে নতুন? ' : 'New to Pingo? ',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: AppColors.paperMuted,
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                ref.read(authProvider.notifier).clearError();
+                                PingoSignupScreen.open(context);
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 6,
+                                ),
+                                child: Text(
+                                  isBangla ? 'সাইন আপ করুন' : 'Sign up',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.signalAmber,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // ── "Continue without an account" (Matches '5. Log in.png') ──
+                        Center(
+                          child: TextButton(
+                            onPressed: _handleContinueAsGuest,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.paperMuted,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                            ),
+                            child: Text(
+                              isBangla
+                                  ? 'অ্যাকাউন্ট ছাড়াই চালিয়ে যান'
+                                  : 'Continue without an account',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.paperSubtle,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String hintText,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      filled: true,
+      fillColor: AppColors.inkCard,
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: AppColors.paperSubtle,
+        fontSize: 15,
+        fontWeight: FontWeight.w400,
+      ),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 16, right: 12),
+        child: Icon(
+          prefixIcon,
+          size: 20,
+          color: AppColors.paperSubtle,
+        ),
+      ),
+      prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 20),
+      suffixIcon: suffixIcon,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.inkBorder, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.signalAmber, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.overdue, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.overdue, width: 1.5),
+      ),
+      errorStyle: const TextStyle(
+        color: AppColors.overdue,
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
       ),
     );
   }
